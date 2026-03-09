@@ -2,11 +2,17 @@ import { supabase } from '@/lib/supabase'
 
 export default function Login() {
   const handleKakaoLogin = async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'kakao' })
+    await supabase.auth.signInWithOAuth({
+      provider: 'kakao',
+      options: { redirectTo: `${window.location.origin}/` },
+    })
   }
 
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'google' })
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/` },
+    })
   }
 
   return (
