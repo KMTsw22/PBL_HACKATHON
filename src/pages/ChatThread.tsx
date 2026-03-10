@@ -120,7 +120,7 @@ export default function ChatThread() {
                           {(otherUser?.name || '?').charAt(0)}
                         </div>
                       )
-                    )
+                    )}
                   </div>
                   <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
                     <div
