@@ -20,14 +20,22 @@ type Message = {
 }
 
 function useRevealAndTyping(lastMsgWithSteps: Message | null) {
+  const [ready, setReady] = useState(false)
   const [revealedBlockIndex, setRevealedBlockIndex] = useState(0)
   const [typingLen, setTypingLen] = useState(0)
 
   useEffect(() => {
-    if (lastMsgWithSteps) {
-      setRevealedBlockIndex(0)
-      setTypingLen(0)
+    if (!lastMsgWithSteps) {
+      setReady(false)
+      return
     }
+    setReady(false)
+    setRevealedBlockIndex(0)
+    setTypingLen(0)
+    const t = requestAnimationFrame(() => {
+      setReady(true)
+    })
+    return () => cancelAnimationFrame(t)
   }, [lastMsgWithSteps?.id])
 
   const blockTexts: string[] = lastMsgWithSteps?.steps?.length
@@ -56,7 +64,7 @@ function useRevealAndTyping(lastMsgWithSteps: Message | null) {
     }
   }, [lastMsgWithSteps?.id, totalBlocks, revealedBlockIndex, typingLen, currentText.length])
 
-  return { revealedBlockIndex, typingLen, blockTexts, totalBlocks }
+  return { ready, revealedBlockIndex, typingLen, blockTexts, totalBlocks }
 }
 
 export default function Ask() {
@@ -165,12 +173,15 @@ export default function Ask() {
                     const isAnimating = lastAgentMsgWithSteps?.id === msg.id
                     const steps = msg.steps!
                     let blockIdx = 0
+                    const canAnimate = isAnimating && reveal.ready
 
                     const showBanner = !isAnimating || reveal.revealedBlockIndex >= blockIdx
                     const bannerText = `${agentCount}명의 에이전트가 참여했어요. 총괄 에이전트가 순서대로 요청하고 답을 받았어요.`
-                    const bannerDisplay = isAnimating && reveal.revealedBlockIndex === blockIdx
-                      ? bannerText.slice(0, reveal.typingLen)
-                      : bannerText
+                    const bannerDisplay = !canAnimate && isAnimating
+                      ? '에이전트가 답변을 준비하고 있어요...'
+                      : canAnimate && reveal.revealedBlockIndex === blockIdx
+                        ? bannerText.slice(0, reveal.typingLen)
+                        : bannerText
                     blockIdx++
 
                     return (
@@ -190,7 +201,7 @@ export default function Ask() {
                             </div>
                             <p className="text-sm font-medium text-[#FF9C8F] text-center px-4 py-2 rounded-full bg-[#FFE4E0]/60">
                               {bannerDisplay}
-                              {isAnimating && reveal.revealedBlockIndex === 0 && reveal.typingLen < bannerText.length && (
+                              {canAnimate && reveal.revealedBlockIndex === 0 && reveal.typingLen < bannerText.length && (
                                 <span className="inline-block w-0.5 h-4 ml-0.5 bg-[#FF9C8F] animate-pulse" />
                               )}
                             </p>
@@ -199,11 +210,11 @@ export default function Ask() {
 
                         {steps.map((step, i) => {
                           const isRequest = step.type === 'request'
-                          const showBlock = !isAnimating || reveal.revealedBlockIndex >= blockIdx
+                          const showBlock = !isAnimating || (canAnimate && reveal.revealedBlockIndex >= blockIdx)
                           const content = isRequest ? step.requestText : step.content
-                          const displayLen = isAnimating && reveal.revealedBlockIndex === blockIdx ? reveal.typingLen : content.length
+                          const displayLen = canAnimate && reveal.revealedBlockIndex === blockIdx ? reveal.typingLen : content.length
                           const displayText = content.slice(0, displayLen)
-                          const isTyping = isAnimating && reveal.revealedBlockIndex === blockIdx && displayLen < content.length
+                          const isTyping = canAnimate && reveal.revealedBlockIndex === blockIdx && displayLen < content.length
                           blockIdx++
 
                           if (!showBlock) return null
@@ -237,7 +248,7 @@ export default function Ask() {
                           )
                         })}
 
-                        {(!isAnimating || reveal.revealedBlockIndex >= blockIdx) && (
+                        {(!isAnimating || (canAnimate && reveal.revealedBlockIndex >= blockIdx)) && (
                           <>
                             <div className="flex gap-3 mt-4">
                               <div className="w-9 h-9 rounded-full bg-[#FF9C8F] flex items-center justify-center flex-shrink-0">
@@ -247,17 +258,17 @@ export default function Ask() {
                                 <p className="text-xs font-semibold text-[#FF9C8F] uppercase tracking-wide mb-1">총괄 에이전트 최종 정리</p>
                                 <div className="rounded-2xl px-4 py-3 bg-white text-gray-900 shadow-sm border border-[#FFE4E0]">
                                   <p className="text-sm">
-                                    {isAnimating && reveal.revealedBlockIndex === blockIdx
+                                    {canAnimate && reveal.revealedBlockIndex === blockIdx
                                       ? msg.text.slice(0, reveal.typingLen)
                                       : msg.text}
-                                    {isAnimating && reveal.revealedBlockIndex === blockIdx && reveal.typingLen < msg.text.length && (
+                                    {canAnimate && reveal.revealedBlockIndex === blockIdx && reveal.typingLen < msg.text.length && (
                                       <span className="inline-block w-0.5 h-4 ml-0.5 bg-[#FF9C8F] animate-pulse align-middle" />
                                     )}
                                   </p>
                                 </div>
                               </div>
                             </div>
-                            {msg.recommendations && msg.recommendations.length > 0 && (!isAnimating || reveal.revealedBlockIndex > blockIdx) && (
+                            {msg.recommendations && msg.recommendations.length > 0 && (!isAnimating || (canAnimate && reveal.revealedBlockIndex > blockIdx)) && (
                               <div className="mt-4 pl-12 space-y-2">
                                 {msg.recommendations.map((r) => (
                                   <button
