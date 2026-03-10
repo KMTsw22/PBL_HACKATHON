@@ -153,13 +153,14 @@ async function runSuggestContact(
   const cardSummaries = cards.map((c) => {
     const collectedId = cardIdToCollectedId.get(c.id as string)
     const scores = collectedId ? scoresByCollected.get(collectedId) ?? [] : []
+    const contactParts = [(c as Record<string, unknown>).email, (c as Record<string, unknown>).kakao_id, (c as Record<string, unknown>).phone].filter(Boolean)
     return {
       id: c.id,
       name: c.card_name || 'Unknown',
       title: c.custom_title || '',
       expertise: c.custom_content || '',
-      contact: [c.email, c.kakao_id, c.phone].filter(Boolean).join(', '),
-      description: (c.description || '').slice(0, 150),
+      contact: contactParts.join(', '),
+      description: String((c as Record<string, unknown>).description || '').slice(0, 150),
       scores: scores.map((s) => `${s.category}:${s.score}`).join(', '),
     }
   })
@@ -285,9 +286,15 @@ serve(async (req) => {
       return new Response(JSON.stringify({ message: 'Invalid JSON body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const messages = body.messages ?? []
-    if (!Array.isArray(messages) || messages.length === 0) {
+    const rawMessages = body.messages ?? []
+    if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
       return new Response(JSON.stringify({ message: 'messages array required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+    const messages = rawMessages
+      .filter((m) => m && typeof m.role === 'string')
+      .map((m) => ({ role: m.role, content: String(m.content ?? '') }))
+    if (messages.length === 0) {
+      return new Response(JSON.stringify({ message: 'Valid messages (role, content) required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -306,7 +313,9 @@ serve(async (req) => {
 
     const openAiMessages: OpenAIMessage[] = [
       { role: 'system', content: ORCHESTRATOR_SYSTEM },
-      ...messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ...messages
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content || '(empty)' })),
     ]
 
     let recommendations: { card: Record<string, unknown>; reason: string }[] = []
@@ -337,21 +346,24 @@ serve(async (req) => {
         )
       }
 
-      const data = await res.json()
-      const choice = data?.choices?.[0]
-      const msg = choice?.message
-      if (!msg) {
+      let data: { choices?: { message?: { content?: string | null; tool_calls?: { id?: string; function?: { name?: string; arguments?: string } }[] } }[] }
+      try {
+        data = await res.json()
+      } catch {
         return new Response(
-          JSON.stringify({ message: 'AI 응답이 비어 있습니다.' }),
+          JSON.stringify({ message: 'AI 응답 파싱 실패' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-
-      openAiMessages.push({
-        role: 'assistant',
-        content: msg.content ?? null,
-        tool_calls: [msg.tool_calls[0]],
-      })
+      const choice = data?.choices?.[0]
+      const msg = choice?.message
+      if (!msg) {
+        const errDetail = (data as { error?: { message?: string } })?.error?.message
+        return new Response(
+          JSON.stringify({ message: errDetail || 'AI 응답이 비어 있습니다.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
 
       if (!msg.tool_calls || msg.tool_calls.length === 0) {
         const finalText = (msg.content ?? '').trim() || '답변을 생성하지 못했어요.'
@@ -367,8 +379,21 @@ serve(async (req) => {
         )
       }
 
+      openAiMessages.push({
+        role: 'assistant',
+        content: msg.content ?? null,
+        tool_calls: [msg.tool_calls[0]],
+      })
+
       // 한 턴에 하나의 도구만 실행: 총괄이 한 명한테 물어보고 → 답 받고 → 다음 턴에서 다음 에이전트 호출
       const tc = msg.tool_calls[0]
+      if (!tc || !tc.function) {
+        console.error('[ask-agent] invalid tool_call', tc)
+        return new Response(
+          JSON.stringify({ message: '도구 호출 형식이 올바르지 않아요.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
       const name = tc.function?.name
       const args = (() => {
         try {
@@ -442,9 +467,10 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (e) {
-    console.error('[ask-agent]', e)
+    const err = e instanceof Error ? e : new Error(String(e))
+    console.error('[ask-agent]', err.message, err.stack)
     return new Response(
-      JSON.stringify({ message: e instanceof Error ? e.message : 'Internal error' }),
+      JSON.stringify({ message: err.message || 'Internal error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
