@@ -5,11 +5,16 @@ export type AskAgentMessage = { role: 'user' | 'assistant'; content: string }
 
 export type AgentResponseBlock = { agent: string; content: string }
 
+export type AgentStep =
+  | { type: 'request'; to: string; requestText: string }
+  | { type: 'response'; from: string; content: string }
+
 export type AskAgentResponse = {
   message: string
   recommendations?: { card: UserCard; reason: string }[]
   agentsUsed?: string[]
   agentResponses?: AgentResponseBlock[]
+  steps?: AgentStep[]
 }
 
 export async function askAgent(messages: AskAgentMessage[]): Promise<AskAgentResponse> {
@@ -27,6 +32,7 @@ export async function askAgent(messages: AskAgentMessage[]): Promise<AskAgentRes
     recommendations?: { card: UserCard; reason: string }[]
     agentsUsed?: string[]
     agentResponses?: AgentResponseBlock[]
+    steps?: AgentStep[]
   }
 
   return {
@@ -34,5 +40,6 @@ export async function askAgent(messages: AskAgentMessage[]): Promise<AskAgentRes
     recommendations: json.recommendations,
     agentsUsed: json.agentsUsed,
     agentResponses: json.agentResponses,
+    steps: json.steps,
   }
 }

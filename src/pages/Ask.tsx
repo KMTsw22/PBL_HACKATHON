@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { askAgent, type AskAgentMessage } from '@/lib/askAgent'
+import { askAgent, type AskAgentMessage, type AgentStep } from '@/lib/askAgent'
 import type { RecommendResult } from '@/lib/recommendFromCollected'
 import CardDetailModal from '@/components/CardDetailModal'
 import type { UserCard } from '@/hooks/useUserCards'
@@ -13,6 +13,7 @@ type Message = {
   recommendations?: RecommendResult[]
   agentsUsed?: string[]
   agentResponses?: AgentResponseBlock[]
+  steps?: AgentStep[]
 }
 
 export default function Ask() {
@@ -47,7 +48,7 @@ export default function Ask() {
       )
       history.push({ role: 'user', content: text })
 
-      const { message, recommendations, agentsUsed, agentResponses } = await askAgent(history)
+      const { message, recommendations, agentsUsed, agentResponses, steps } = await askAgent(history)
       setMessages((prev) => [
         ...prev,
         {
@@ -57,6 +58,7 @@ export default function Ask() {
           recommendations,
           agentsUsed,
           agentResponses,
+          steps,
         },
       ])
     } catch (e) {
@@ -103,12 +105,13 @@ export default function Ask() {
             )
           }
 
+          const hasSteps = msg.steps && msg.steps.length > 0
           const hasDiscussion = msg.agentResponses && msg.agentResponses.length > 0
           const agentCount = msg.agentsUsed?.length ?? 0
 
           return (
             <div key={msg.id} className="mb-6">
-              {hasDiscussion && agentCount > 0 && (
+              {(hasSteps || hasDiscussion) && agentCount > 0 && (
                 <div className="flex flex-col items-center mb-4">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     {[...Array(agentCount)].map((_, i) => (
@@ -125,12 +128,82 @@ export default function Ask() {
                     ))}
                   </div>
                   <p className="text-sm font-medium text-[#FF9C8F] text-center px-4 py-2 rounded-full bg-[#FFE4E0]/60">
-                    {agentCount}명의 에이전트가 참여했어요. 토론 내용을 확인해보세요.
+                    {agentCount}명의 에이전트가 참여했어요. 총괄 에이전트가 순서대로 요청하고 답을 받았어요.
                   </p>
                 </div>
               )}
 
-              {hasDiscussion ? (
+              {hasSteps ? (
+                <div className="space-y-3">
+                  {msg.steps!.map((step, i) =>
+                    step.type === 'request' ? (
+                      <div key={i} className="flex gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#FF9C8F] flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-xs font-bold">총괄</span>
+                        </div>
+                        <div className="flex-1 min-w-0 max-w-[85%]">
+                          <p className="text-xs font-semibold text-[#FF9C8F] mb-1">총괄 에이전트 → {step.to} 에이전트에게 요청</p>
+                          <div className="rounded-2xl px-4 py-3 bg-[#FFE4E0]/50 text-gray-800 border border-[#FF9C8F]/30">
+                            <p className="text-sm whitespace-pre-wrap">{step.requestText}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={i} className="flex gap-3">
+                        <div className="w-9 h-9 rounded-full bg-[#FFE4E0] flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-[#FF9C8F]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="4" y="10" width="16" height="10" rx="1" />
+                            <path d="M12 6V4M8 8h2M14 8h2" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0 max-w-[85%]">
+                          <p className="text-xs font-semibold text-[#FF9C8F] uppercase tracking-wide mb-1">{step.from} 에이전트 답변</p>
+                          <div className="rounded-2xl px-4 py-3 bg-white text-gray-900 shadow-sm border border-gray-100">
+                            <p className="text-sm whitespace-pre-wrap">{step.content}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  )}
+
+                  <div className="flex gap-3 mt-4">
+                    <div className="w-9 h-9 rounded-full bg-[#FF9C8F] flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-xs font-bold">O</span>
+                    </div>
+                    <div className="flex-1 min-w-0 max-w-[85%]">
+                      <p className="text-xs font-semibold text-[#FF9C8F] uppercase tracking-wide mb-1">총괄 에이전트 최종 정리</p>
+                      <div className="rounded-2xl px-4 py-3 bg-white text-gray-900 shadow-sm border border-[#FFE4E0]">
+                        <p className="text-sm">{msg.text}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {msg.recommendations && msg.recommendations.length > 0 && (
+                    <div className="mt-4 pl-12 space-y-2">
+                      {msg.recommendations.map((r) => (
+                        <button
+                          key={r.card.id}
+                          type="button"
+                          onClick={() => setSelectedCard(r.card)}
+                          className="w-full flex items-center gap-3 p-3 bg-white hover:bg-[#FFE4E0]/30 rounded-xl text-left transition-colors border border-gray-100"
+                        >
+                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#FFE4E0] flex-shrink-0">
+                            <img src={r.card.image_url} alt="" className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{r.card.card_name || 'My Card'}</p>
+                            <p className="text-xs text-[#FF9C8F] truncate">{r.card.custom_title || 'Professional'}</p>
+                            {r.reason && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{r.reason}</p>}
+                          </div>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-gray-400">
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : hasDiscussion ? (
                 <div className="space-y-3">
                   {msg.agentResponses!.map((block, i) => (
                     <div key={i} className="flex gap-3">
@@ -148,7 +221,6 @@ export default function Ask() {
                       </div>
                     </div>
                   ))}
-
                   <div className="flex gap-3 mt-4">
                     <div className="w-9 h-9 rounded-full bg-[#FF9C8F] flex items-center justify-center flex-shrink-0">
                       <span className="text-white text-xs font-bold">O</span>
@@ -160,7 +232,6 @@ export default function Ask() {
                       </div>
                     </div>
                   </div>
-
                   {msg.recommendations && msg.recommendations.length > 0 && (
                     <div className="mt-4 pl-12 space-y-2">
                       {msg.recommendations.map((r) => (

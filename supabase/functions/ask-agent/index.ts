@@ -20,10 +20,9 @@ Sub-agents (tools) — **call multiple when the request is broad**:
 3. suggest_tech(idea_summary) - Tech stack (frontend, backend, DB, deployment) for an app idea. Pass a short idea summary.
 4. suggest_contact(user_request) - Who to contact from collected cards and how to reach out. Use when user wants to "연락하고 싶어", "컨택해보려고", "이 사람한테 어떻게 말 걸지", or needs outreach/message tips.
 
-**Important**: For broad requests like "팬커뮤니티 만들고 싶어", "어떤 앱 만들고 싶다" you MUST call at least 2 agents so they collaborate:
-- First call suggest_idea with the user's request (get planning/idea advice).
-- Then call suggest_tech with a brief summary of that idea (get tech stack).
-This way the user sees multiple experts working together. When the user mentions contacting someone or networking (컨택, 연락, 메시지, 어떻게 말하지), also call suggest_contact. After you get all tool results, write a short final summary in Korean that ties their answers together.`
+**Critical**: You must call ONE tool at a time. In each turn you may call only ONE tool. After you receive that tool's result, you will get another turn to either call another tool or to reply with your final summary to the user. So the flow is: call suggest_idea → get result → then call suggest_tech (or another tool) → get result → then either call more tools or write final summary.
+
+For broad requests like "팬커뮤니티 만들고 싶어": first call suggest_idea with the user's request. After you get the idea result, call suggest_tech with a short summary of that idea. When the user mentions contacting someone (컨택, 연락), call suggest_contact. After you have enough tool results, reply with a final summary in Korean (no more tool calls).`
 
 async function runRecommendTalent(
   supabase: ReturnType<typeof createClient>,
@@ -313,6 +312,8 @@ serve(async (req) => {
     let recommendations: { card: Record<string, unknown>; reason: string }[] = []
     const agentsUsed = new Set<string>()
     const agentResponses: { agent: string; content: string }[] = []
+    type Step = { type: 'request'; to: string; requestText: string } | { type: 'response'; from: string; content: string }
+    const steps: Step[] = []
 
     for (let round = 0; round < 5; round++) {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -349,7 +350,7 @@ serve(async (req) => {
       openAiMessages.push({
         role: 'assistant',
         content: msg.content ?? null,
-        tool_calls: msg.tool_calls,
+        tool_calls: [msg.tool_calls[0]],
       })
 
       if (!msg.tool_calls || msg.tool_calls.length === 0) {
@@ -360,60 +361,72 @@ serve(async (req) => {
             recommendations: recommendations.length > 0 ? recommendations : undefined,
             agentsUsed: Array.from(agentsUsed),
             agentResponses: agentResponses.length > 0 ? agentResponses : undefined,
+            steps: steps.length > 0 ? steps : undefined,
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      for (const tc of msg.tool_calls) {
-        const name = tc.function?.name
-        const args = (() => {
-          try {
-            return JSON.parse(tc.function?.arguments ?? '{}')
-          } catch {
-            return {}
-          }
-        })()
-
-        let toolResult: string
-        let agentLabel: string
-
-        if (name === 'recommend_talent') {
-          agentLabel = '인재 추천'
-          agentsUsed.add(agentLabel)
-          const out = await runRecommendTalent(supabase, openaiKey, user.id, args.query ?? '')
-          recommendations.push(...out.recommendations)
-          toolResult = out.summary
-        } else if (name === 'suggest_idea') {
-          agentLabel = '기획·아이디어'
-          agentsUsed.add(agentLabel)
-          toolResult = await callLlm(
-            openaiKey,
-            'You are an app/product idea consultant. Answer in Korean. Give concise, practical brainstorming and planning advice.',
-            args.user_request ?? ''
-          )
-        } else if (name === 'suggest_tech') {
-          agentLabel = '기술 스택'
-          agentsUsed.add(agentLabel)
-          toolResult = await callLlm(
-            openaiKey,
-            'You recommend technology stacks (frontend, backend, DB, deployment) for app ideas. Answer in Korean. Be specific (e.g. React, Node, Supabase).',
-            args.idea_summary ?? ''
-          )
-        } else if (name === 'suggest_contact') {
-          agentLabel = '컨택'
-          agentsUsed.add(agentLabel)
-          const out = await runSuggestContact(supabase, openaiKey, user.id, args.user_request ?? '')
-          recommendations.push(...out.recommendations)
-          toolResult = out.summary
-        } else {
-          agentLabel = '알 수 없음'
-          toolResult = '알 수 없는 도구입니다.'
+      // 한 턴에 하나의 도구만 실행: 총괄이 한 명한테 물어보고 → 답 받고 → 다음 턴에서 다음 에이전트 호출
+      const tc = msg.tool_calls[0]
+      const name = tc.function?.name
+      const args = (() => {
+        try {
+          return JSON.parse(tc.function?.arguments ?? '{}')
+        } catch {
+          return {}
         }
+      })()
 
-        agentResponses.push({ agent: agentLabel, content: toolResult })
-        openAiMessages.push({ role: 'tool', tool_call_id: tc.id, content: toolResult })
+      let toolResult: string
+      let agentLabel: string
+      let requestText: string
+
+      if (name === 'recommend_talent') {
+        agentLabel = '인재 추천'
+        requestText = `인재 추천 요청: "${args.query ?? ''}"`
+        agentsUsed.add(agentLabel)
+        steps.push({ type: 'request', to: agentLabel, requestText })
+        const out = await runRecommendTalent(supabase, openaiKey, user.id, args.query ?? '')
+        recommendations.push(...out.recommendations)
+        toolResult = out.summary
+      } else if (name === 'suggest_idea') {
+        agentLabel = '기획·아이디어'
+        requestText = `기획·아이디어 조언 요청: "${args.user_request ?? ''}"`
+        agentsUsed.add(agentLabel)
+        steps.push({ type: 'request', to: agentLabel, requestText })
+        toolResult = await callLlm(
+          openaiKey,
+          'You are an app/product idea consultant. Answer in Korean. Give concise, practical brainstorming and planning advice.',
+          args.user_request ?? ''
+        )
+      } else if (name === 'suggest_tech') {
+        agentLabel = '기술 스택'
+        requestText = `기술 스택 추천 요청 (아이디어 요약): "${args.idea_summary ?? ''}"`
+        agentsUsed.add(agentLabel)
+        steps.push({ type: 'request', to: agentLabel, requestText })
+        toolResult = await callLlm(
+          openaiKey,
+          'You recommend technology stacks (frontend, backend, DB, deployment) for app ideas. Answer in Korean. Be specific (e.g. React, Node, Supabase).',
+          args.idea_summary ?? ''
+        )
+      } else if (name === 'suggest_contact') {
+        agentLabel = '컨택'
+        requestText = `컨택·연락 추천 요청: "${args.user_request ?? ''}"`
+        agentsUsed.add(agentLabel)
+        steps.push({ type: 'request', to: agentLabel, requestText })
+        const out = await runSuggestContact(supabase, openaiKey, user.id, args.user_request ?? '')
+        recommendations.push(...out.recommendations)
+        toolResult = out.summary
+      } else {
+        agentLabel = '알 수 없음'
+        requestText = ''
+        toolResult = '알 수 없는 도구입니다.'
       }
+
+      steps.push({ type: 'response', from: agentLabel, content: toolResult })
+      agentResponses.push({ agent: agentLabel, content: toolResult })
+      openAiMessages.push({ role: 'tool', tool_call_id: tc.id, content: toolResult })
     }
 
     const lastAssistant = openAiMessages.filter((m) => m.role === 'assistant').pop() as { content?: string | null } | undefined
@@ -424,6 +437,7 @@ serve(async (req) => {
         recommendations: recommendations.length > 0 ? recommendations : undefined,
         agentsUsed: Array.from(agentsUsed),
         agentResponses: agentResponses.length > 0 ? agentResponses : undefined,
+        steps: steps.length > 0 ? steps : undefined,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
