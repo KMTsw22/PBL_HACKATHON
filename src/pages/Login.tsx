@@ -1,17 +1,23 @@
 import { supabase } from '@/lib/supabase'
 
+const getRedirectUrl = () => {
+  const envUrl = import.meta.env.VITE_APP_URL
+  if (envUrl) return `${envUrl.replace(/\/$/, '')}/`
+  return `${window.location.origin}/`
+}
+
 export default function Login() {
   const handleKakaoLogin = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'kakao',
-      options: { redirectTo: `${window.location.origin}/` },
+      options: { redirectTo: getRedirectUrl() },
     })
   }
 
   const handleGoogleLogin = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/` },
+      options: { redirectTo: getRedirectUrl() },
     })
   }
 

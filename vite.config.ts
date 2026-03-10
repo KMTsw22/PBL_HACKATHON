@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
+  base: './', // Capacitor 네이티브 앱에서 asset 로딩용
   plugins: [
     react(),
     VitePWA({

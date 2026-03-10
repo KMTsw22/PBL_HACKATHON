@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { recommendFromCollected, type RecommendResult } from '@/lib/recommendFromCollected'
+import { askAgent, type AskAgentMessage } from '@/lib/askAgent'
+import type { RecommendResult } from '@/lib/recommendFromCollected'
 import CardDetailModal from '@/components/CardDetailModal'
 import type { UserCard } from '@/hooks/useUserCards'
 
@@ -8,6 +9,7 @@ type Message = {
   type: 'user' | 'agent'
   text: string
   recommendations?: RecommendResult[]
+  agentsUsed?: string[]
 }
 
 export default function Ask() {
@@ -16,7 +18,7 @@ export default function Ask() {
     {
       id: 'welcome',
       type: 'agent',
-      text: '안녕하세요! 수집한 명함 중에서 인재를 추천해드려요. 예: "프론트엔드 개발자가 필요해", "해커톤 팀원 구해요"',
+      text: '안녕하세요! 저는 상위 에이전트예요. "어떤 앱을 만들고 싶다", "팀원 구해요", "기술 스택 추천해줘"처럼 말씀해주시면 하위 에이전트(인재 추천·기획·기술)가 함께 답해드려요.',
     },
   ])
   const [loading, setLoading] = useState(false)
@@ -32,11 +34,17 @@ export default function Ask() {
     if (!text || loading) return
 
     setInput('')
-    setMessages((prev) => [...prev, { id: `u-${Date.now()}`, type: 'user', text }])
+    const userMsg: Message = { id: `u-${Date.now()}`, type: 'user', text }
+    setMessages((prev) => [...prev, userMsg])
     setLoading(true)
 
     try {
-      const { recommendations, message } = await recommendFromCollected(text)
+      const history: AskAgentMessage[] = messages.map((m) =>
+        m.type === 'user' ? { role: 'user' as const, content: m.text } : { role: 'assistant' as const, content: m.text }
+      )
+      history.push({ role: 'user', content: text })
+
+      const { message, recommendations, agentsUsed } = await askAgent(history)
       setMessages((prev) => [
         ...prev,
         {
@@ -44,6 +52,7 @@ export default function Ask() {
           type: 'agent',
           text: message,
           recommendations,
+          agentsUsed,
         },
       ])
     } catch (e) {
@@ -52,7 +61,7 @@ export default function Ask() {
         {
           id: `a-${Date.now()}`,
           type: 'agent',
-          text: e instanceof Error ? e.message : '추천을 불러오지 못했어요.',
+          text: e instanceof Error ? e.message : '에이전트 응답을 불러오지 못했어요.',
         },
       ])
     } finally {
@@ -75,7 +84,7 @@ export default function Ask() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        <p className="text-center text-xs text-gray-400 mb-4">수집한 명함 기반 인재 추천</p>
+        <p className="text-center text-xs text-gray-400 mb-4">오케스트레이터 + 하위 에이전트 (인재·기획·기술)</p>
         {messages.map((msg) => (
           <div key={msg.id} className={`flex gap-3 mb-4 ${msg.type === 'user' ? 'flex-row-reverse' : ''}`}>
             {msg.type === 'agent' && (
@@ -85,7 +94,11 @@ export default function Ask() {
             )}
             <div className={`flex-1 max-w-[85%] ${msg.type === 'user' ? 'flex flex-col items-end' : ''}`}>
               {msg.type === 'agent' && (
-                <p className="text-xs font-medium text-[#FF9C8F] mb-1">Global Agent</p>
+                <p className="text-xs font-medium text-[#FF9C8F] mb-1">
+                  {msg.agentsUsed && msg.agentsUsed.length > 0
+                    ? `오케스트레이터 · ${msg.agentsUsed.join(', ')}`
+                    : '오케스트레이터'}
+                </p>
               )}
               {msg.type === 'user' && (
                 <p className="text-xs text-gray-400 mb-1">You</p>
@@ -147,7 +160,7 @@ export default function Ask() {
         <div className="flex gap-2 bg-gray-100 rounded-xl px-4 py-3">
           <input
             type="text"
-            placeholder="예: 프론트엔드 개발자가 필요해"
+            placeholder="예: 어떤 앱을 만들고 싶다 / 팀원 구해요"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
