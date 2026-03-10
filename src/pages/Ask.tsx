@@ -4,6 +4,9 @@ import type { RecommendResult } from '@/lib/recommendFromCollected'
 import CardDetailModal from '@/components/CardDetailModal'
 import type { UserCard } from '@/hooks/useUserCards'
 
+const TYPING_INTERVAL_MS = 18
+const BLOCK_DELAY_MS = 400
+
 type AgentResponseBlock = { agent: string; content: string }
 
 type Message = {
@@ -14,6 +17,46 @@ type Message = {
   agentsUsed?: string[]
   agentResponses?: AgentResponseBlock[]
   steps?: AgentStep[]
+}
+
+function useRevealAndTyping(lastMsgWithSteps: Message | null) {
+  const [revealedBlockIndex, setRevealedBlockIndex] = useState(0)
+  const [typingLen, setTypingLen] = useState(0)
+
+  useEffect(() => {
+    if (lastMsgWithSteps) {
+      setRevealedBlockIndex(0)
+      setTypingLen(0)
+    }
+  }, [lastMsgWithSteps?.id])
+
+  const blockTexts: string[] = lastMsgWithSteps?.steps?.length
+    ? [
+        `${lastMsgWithSteps.agentsUsed?.length ?? 0}명의 에이전트가 참여했어요. 총괄 에이전트가 순서대로 요청하고 답을 받았어요.`,
+        ...lastMsgWithSteps.steps.flatMap((s) => (s.type === 'request' ? [s.requestText] : [s.content])),
+        lastMsgWithSteps.text,
+        ...(lastMsgWithSteps.recommendations?.length ? [''] : []),
+      ]
+    : []
+  const totalBlocks = blockTexts.length
+  const currentText = blockTexts[revealedBlockIndex] ?? ''
+
+  useEffect(() => {
+    if (!lastMsgWithSteps || totalBlocks === 0) return
+    if (typingLen < currentText.length) {
+      const t = setTimeout(() => setTypingLen((n) => n + 1), TYPING_INTERVAL_MS)
+      return () => clearTimeout(t)
+    }
+    if (revealedBlockIndex < totalBlocks - 1) {
+      const t = setTimeout(() => {
+        setRevealedBlockIndex((i) => i + 1)
+        setTypingLen(0)
+      }, BLOCK_DELAY_MS)
+      return () => clearTimeout(t)
+    }
+  }, [lastMsgWithSteps?.id, totalBlocks, revealedBlockIndex, typingLen, currentText.length])
+
+  return { revealedBlockIndex, typingLen, blockTexts, totalBlocks }
 }
 
 export default function Ask() {
@@ -29,9 +72,14 @@ export default function Ask() {
   const [selectedCard, setSelectedCard] = useState<UserCard | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  const lastAgentMsgWithSteps = messages.filter(
+    (m) => m.type === 'agent' && m.steps && m.steps.length > 0
+  ).pop() ?? null
+  const reveal = useRevealAndTyping(lastAgentMsgWithSteps)
+
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, reveal.revealedBlockIndex, reveal.typingLen])
 
   const handleSend = async () => {
     const text = input.trim()
@@ -111,97 +159,133 @@ export default function Ask() {
 
           return (
             <div key={msg.id} className="mb-6">
-              {(hasSteps || hasDiscussion) && agentCount > 0 && (
-                <div className="flex flex-col items-center mb-4">
-                  <div className="flex items-center justify-center gap-2 mb-2">
-                    {[...Array(agentCount)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="w-10 h-10 rounded-full bg-[#FFE4E0] flex items-center justify-center flex-shrink-0 border-2 border-[#FF9C8F]"
-                      >
-                        <svg className="w-5 h-5 text-[#FF9C8F]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <rect x="4" y="10" width="16" height="10" rx="1" />
-                          <path d="M12 6V4M8 8h2M14 8h2" />
-                          <path d="M12 14v4M9 18h6" />
-                        </svg>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-sm font-medium text-[#FF9C8F] text-center px-4 py-2 rounded-full bg-[#FFE4E0]/60">
-                    {agentCount}명의 에이전트가 참여했어요. 총괄 에이전트가 순서대로 요청하고 답을 받았어요.
-                  </p>
-                </div>
-              )}
-
               {hasSteps ? (
                 <div className="space-y-3">
-                  {msg.steps!.map((step, i) =>
-                    step.type === 'request' ? (
-                      <div key={i} className="flex gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#FF9C8F] flex items-center justify-center flex-shrink-0">
-                          <span className="text-white text-xs font-bold">총괄</span>
-                        </div>
-                        <div className="flex-1 min-w-0 max-w-[85%]">
-                          <p className="text-xs font-semibold text-[#FF9C8F] mb-1">총괄 에이전트 → {step.to} 에이전트에게 요청</p>
-                          <div className="rounded-2xl px-4 py-3 bg-[#FFE4E0]/50 text-gray-800 border border-[#FF9C8F]/30">
-                            <p className="text-sm whitespace-pre-wrap">{step.requestText}</p>
+                  {(() => {
+                    const isAnimating = lastAgentMsgWithSteps?.id === msg.id
+                    const steps = msg.steps!
+                    let blockIdx = 0
+
+                    const showBanner = !isAnimating || reveal.revealedBlockIndex >= blockIdx
+                    const bannerText = `${agentCount}명의 에이전트가 참여했어요. 총괄 에이전트가 순서대로 요청하고 답을 받았어요.`
+                    const bannerDisplay = isAnimating && reveal.revealedBlockIndex === blockIdx
+                      ? bannerText.slice(0, reveal.typingLen)
+                      : bannerText
+                    blockIdx++
+
+                    return (
+                      <>
+                        {showBanner && (
+                          <div className="flex flex-col items-center mb-4">
+                            <div className="flex items-center justify-center gap-2 mb-2">
+                              {[...Array(agentCount)].map((_, i) => (
+                                <div key={i} className="w-10 h-10 rounded-full bg-[#FFE4E0] flex items-center justify-center flex-shrink-0 border-2 border-[#FF9C8F]">
+                                  <svg className="w-5 h-5 text-[#FF9C8F]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="4" y="10" width="16" height="10" rx="1" />
+                                    <path d="M12 6V4M8 8h2M14 8h2" />
+                                    <path d="M12 14v4M9 18h6" />
+                                  </svg>
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-sm font-medium text-[#FF9C8F] text-center px-4 py-2 rounded-full bg-[#FFE4E0]/60">
+                              {bannerDisplay}
+                              {isAnimating && reveal.revealedBlockIndex === 0 && reveal.typingLen < bannerText.length && (
+                                <span className="inline-block w-0.5 h-4 ml-0.5 bg-[#FF9C8F] animate-pulse" />
+                              )}
+                            </p>
                           </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div key={i} className="flex gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#FFE4E0] flex items-center justify-center flex-shrink-0">
-                          <svg className="w-4 h-4 text-[#FF9C8F]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="4" y="10" width="16" height="10" rx="1" />
-                            <path d="M12 6V4M8 8h2M14 8h2" />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0 max-w-[85%]">
-                          <p className="text-xs font-semibold text-[#FF9C8F] uppercase tracking-wide mb-1">{step.from} 에이전트 답변</p>
-                          <div className="rounded-2xl px-4 py-3 bg-white text-gray-900 shadow-sm border border-gray-100">
-                            <p className="text-sm whitespace-pre-wrap">{step.content}</p>
-                          </div>
-                        </div>
-                      </div>
+                        )}
+
+                        {steps.map((step, i) => {
+                          const isRequest = step.type === 'request'
+                          const showBlock = !isAnimating || reveal.revealedBlockIndex >= blockIdx
+                          const content = isRequest ? step.requestText : step.content
+                          const displayLen = isAnimating && reveal.revealedBlockIndex === blockIdx ? reveal.typingLen : content.length
+                          const displayText = content.slice(0, displayLen)
+                          const isTyping = isAnimating && reveal.revealedBlockIndex === blockIdx && displayLen < content.length
+                          blockIdx++
+
+                          if (!showBlock) return null
+                          return isRequest ? (
+                            <div key={i} className="flex gap-3">
+                              <div className="w-9 h-9 rounded-full bg-[#FF9C8F] flex items-center justify-center flex-shrink-0">
+                                <span className="text-white text-xs font-bold">총괄</span>
+                              </div>
+                              <div className="flex-1 min-w-0 max-w-[85%]">
+                                <p className="text-xs font-semibold text-[#FF9C8F] mb-1">총괄 에이전트 → {step.to} 에이전트에게 요청</p>
+                                <div className="rounded-2xl px-4 py-3 bg-[#FFE4E0]/50 text-gray-800 border border-[#FF9C8F]/30">
+                                  <p className="text-sm whitespace-pre-wrap">{displayText}{isTyping && <span className="inline-block w-0.5 h-4 ml-0.5 bg-[#FF9C8F] animate-pulse align-middle" />}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div key={i} className="flex gap-3">
+                              <div className="w-9 h-9 rounded-full bg-[#FFE4E0] flex items-center justify-center flex-shrink-0">
+                                <svg className="w-4 h-4 text-[#FF9C8F]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <rect x="4" y="10" width="16" height="10" rx="1" />
+                                  <path d="M12 6V4M8 8h2M14 8h2" />
+                                </svg>
+                              </div>
+                              <div className="flex-1 min-w-0 max-w-[85%]">
+                                <p className="text-xs font-semibold text-[#FF9C8F] uppercase tracking-wide mb-1">{step.from} 에이전트 답변</p>
+                                <div className="rounded-2xl px-4 py-3 bg-white text-gray-900 shadow-sm border border-gray-100">
+                                  <p className="text-sm whitespace-pre-wrap">{displayText}{isTyping && <span className="inline-block w-0.5 h-4 ml-0.5 bg-[#FF9C8F] animate-pulse align-middle" />}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+
+                        {(!isAnimating || reveal.revealedBlockIndex >= blockIdx) && (
+                          <>
+                            <div className="flex gap-3 mt-4">
+                              <div className="w-9 h-9 rounded-full bg-[#FF9C8F] flex items-center justify-center flex-shrink-0">
+                                <span className="text-white text-xs font-bold">O</span>
+                              </div>
+                              <div className="flex-1 min-w-0 max-w-[85%]">
+                                <p className="text-xs font-semibold text-[#FF9C8F] uppercase tracking-wide mb-1">총괄 에이전트 최종 정리</p>
+                                <div className="rounded-2xl px-4 py-3 bg-white text-gray-900 shadow-sm border border-[#FFE4E0]">
+                                  <p className="text-sm">
+                                    {isAnimating && reveal.revealedBlockIndex === blockIdx
+                                      ? msg.text.slice(0, reveal.typingLen)
+                                      : msg.text}
+                                    {isAnimating && reveal.revealedBlockIndex === blockIdx && reveal.typingLen < msg.text.length && (
+                                      <span className="inline-block w-0.5 h-4 ml-0.5 bg-[#FF9C8F] animate-pulse align-middle" />
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            {msg.recommendations && msg.recommendations.length > 0 && (!isAnimating || reveal.revealedBlockIndex > blockIdx) && (
+                              <div className="mt-4 pl-12 space-y-2">
+                                {msg.recommendations.map((r) => (
+                                  <button
+                                    key={r.card.id}
+                                    type="button"
+                                    onClick={() => setSelectedCard(r.card)}
+                                    className="w-full flex items-center gap-3 p-3 bg-white hover:bg-[#FFE4E0]/30 rounded-xl text-left transition-colors border border-gray-100"
+                                  >
+                                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#FFE4E0] flex-shrink-0">
+                                      <img src={r.card.image_url} alt="" className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-semibold text-gray-900 text-sm truncate">{r.card.card_name || 'My Card'}</p>
+                                      <p className="text-xs text-[#FF9C8F] truncate">{r.card.custom_title || 'Professional'}</p>
+                                      {r.reason && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{r.reason}</p>}
+                                    </div>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-gray-400">
+                                      <polyline points="9 18 15 12 9 6" />
+                                    </svg>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </>
                     )
-                  )}
-
-                  <div className="flex gap-3 mt-4">
-                    <div className="w-9 h-9 rounded-full bg-[#FF9C8F] flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-xs font-bold">O</span>
-                    </div>
-                    <div className="flex-1 min-w-0 max-w-[85%]">
-                      <p className="text-xs font-semibold text-[#FF9C8F] uppercase tracking-wide mb-1">총괄 에이전트 최종 정리</p>
-                      <div className="rounded-2xl px-4 py-3 bg-white text-gray-900 shadow-sm border border-[#FFE4E0]">
-                        <p className="text-sm">{msg.text}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {msg.recommendations && msg.recommendations.length > 0 && (
-                    <div className="mt-4 pl-12 space-y-2">
-                      {msg.recommendations.map((r) => (
-                        <button
-                          key={r.card.id}
-                          type="button"
-                          onClick={() => setSelectedCard(r.card)}
-                          className="w-full flex items-center gap-3 p-3 bg-white hover:bg-[#FFE4E0]/30 rounded-xl text-left transition-colors border border-gray-100"
-                        >
-                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#FFE4E0] flex-shrink-0">
-                            <img src={r.card.image_url} alt="" className="w-full h-full object-cover" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 text-sm truncate">{r.card.card_name || 'My Card'}</p>
-                            <p className="text-xs text-[#FF9C8F] truncate">{r.card.custom_title || 'Professional'}</p>
-                            {r.reason && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{r.reason}</p>}
-                          </div>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-gray-400">
-                            <polyline points="9 18 15 12 9 6" />
-                          </svg>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  })()}
                 </div>
               ) : hasDiscussion ? (
                 <div className="space-y-3">
