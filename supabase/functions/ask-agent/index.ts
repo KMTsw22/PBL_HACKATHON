@@ -18,11 +18,12 @@ Sub-agents (tools) — **call multiple when the request is broad**:
 1. recommend_talent(query) - People/team from user's collected cards. Query in Korean (e.g. "프론트엔드 개발자").
 2. suggest_idea(user_request) - App/product brainstorming and planning advice. Use when user says they want to "make an app", "build something", or need ideas.
 3. suggest_tech(idea_summary) - Tech stack (frontend, backend, DB, deployment) for an app idea. Pass a short idea summary.
+4. suggest_contact(user_request) - Who to contact from collected cards and how to reach out. Use when user wants to "연락하고 싶어", "컨택해보려고", "이 사람한테 어떻게 말 걸지", or needs outreach/message tips.
 
 **Important**: For broad requests like "팬커뮤니티 만들고 싶어", "어떤 앱 만들고 싶다" you MUST call at least 2 agents so they collaborate:
 - First call suggest_idea with the user's request (get planning/idea advice).
 - Then call suggest_tech with a brief summary of that idea (get tech stack).
-This way the user sees multiple experts working together. After you get all tool results, write a short final summary in Korean that ties their answers together.`
+This way the user sees multiple experts working together. When the user mentions contacting someone or networking (컨택, 연락, 메시지, 어떻게 말하지), also call suggest_contact. After you get all tool results, write a short final summary in Korean that ties their answers together.`
 
 async function runRecommendTalent(
   supabase: ReturnType<typeof createClient>,
@@ -117,6 +118,104 @@ async function runRecommendTalent(
   }
 }
 
+async function runSuggestContact(
+  supabase: ReturnType<typeof createClient>,
+  openaiKey: string,
+  userId: string,
+  userRequest: string
+): Promise<{ summary: string; recommendations: { card: Record<string, unknown>; reason: string }[] }> {
+  const { data: collectedRows } = await supabase
+    .from('collected_cards')
+    .select('id, card_id')
+    .eq('user_id', userId)
+
+  if (!collectedRows?.length) {
+    return { summary: '수집한 명함이 없어서 연락 추천을 할 수 없어요.', recommendations: [] }
+  }
+
+  const cardIdList = collectedRows.map((r) => r.card_id).filter(Boolean)
+  const cardIdToCollectedId = new Map(collectedRows.map((r) => [r.card_id, r.id]))
+  const collectedIds = collectedRows.map((r) => r.id)
+
+  const [cardsRes, scoresRes] = await Promise.all([
+    supabase.from('user_cards').select('*').in('id', cardIdList),
+    supabase.from('collected_card_scores').select('collected_card_id, category, score').in('collected_card_id', collectedIds),
+  ])
+
+  const cards = (cardsRes.data ?? []) as Record<string, unknown>[]
+  const scoresRows = scoresRes.data ?? []
+  const scoresByCollected = new Map<string, { category: string; score: number }[]>()
+  for (const s of scoresRows as { collected_card_id: string; category: string; score: number }[]) {
+    const list = scoresByCollected.get(s.collected_card_id) ?? []
+    list.push({ category: s.category, score: Number(s.score) })
+    scoresByCollected.set(s.collected_card_id, list)
+  }
+
+  const cardSummaries = cards.map((c) => {
+    const collectedId = cardIdToCollectedId.get(c.id as string)
+    const scores = collectedId ? scoresByCollected.get(collectedId) ?? [] : []
+    return {
+      id: c.id,
+      name: c.card_name || 'Unknown',
+      title: c.custom_title || '',
+      expertise: c.custom_content || '',
+      contact: [c.email, c.kakao_id, c.phone].filter(Boolean).join(', '),
+      description: (c.description || '').slice(0, 150),
+      scores: scores.map((s) => `${s.category}:${s.score}`).join(', '),
+    }
+  })
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a contact/outreach advisor. User has collected business cards. Return ONLY valid JSON in Korean:
+{"ids": ["uuid1", ...], "reasons": {"uuid1": "why contact in Korean", ...}, "outreachTip": "한 문단 연락 팁 또는 메시지 초안 (한국어)"}
+Suggest 1-3 people to contact. Order by relevance. outreachTip should be practical (how to start the message, what to ask).`,
+        },
+        {
+          role: 'user',
+          content: `User request: "${userRequest}"\n\nCollected contacts:\n${JSON.stringify(cardSummaries, null, 2)}`,
+        },
+      ],
+      max_tokens: 550,
+      temperature: 0.4,
+    }),
+  })
+
+  if (!res.ok) return { summary: '컨택 추천 중 오류가 났습니다.', recommendations: [] }
+
+  const data = await res.json()
+  const content = data?.choices?.[0]?.message?.content?.trim()
+  if (!content) return { summary: '연락 추천 결과가 없습니다.', recommendations: [] }
+
+  let parsed: { ids?: string[]; reasons?: Record<string, string>; outreachTip?: string }
+  try {
+    parsed = JSON.parse(content.replace(/```json\n?|\n?```/g, '').trim())
+  } catch {
+    return { summary: '연락 추천 결과를 파싱하지 못했습니다.', recommendations: [] }
+  }
+
+  const idsFromAi = parsed.ids ?? []
+  const reasons = parsed.reasons ?? {}
+  const outreachTip = parsed.outreachTip ?? ''
+  const cardMap = new Map(cards.map((c) => [c.id, c]))
+  const recs = idsFromAi
+    .filter((id) => cardMap.has(id))
+    .map((id) => ({ card: cardMap.get(id)!, reason: reasons[id] || '' }))
+
+  const names = recs.map((r) => (r.card as Record<string, unknown>).card_name || 'Unknown').join(', ')
+  const summary =
+    (recs.length > 0 ? `연락 추천: ${recs.length}명 (${names}).\n` : '조건에 맞는 연락처를 찾지 못했어요.\n') +
+    (outreachTip ? `\n[연락 팁]\n${outreachTip}` : '')
+
+  return { summary, recommendations: recs }
+}
+
 async function callLlm(openaiKey: string, systemPrompt: string, userContent: string): Promise<string> {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -159,6 +258,14 @@ const TOOLS = [
       name: 'suggest_tech',
       description: '앱/서비스 아이디어에 맞는 기술 스택(프레임워크, DB, 배포 등)을 추천합니다.',
       parameters: { type: 'object' as const, properties: { idea_summary: { type: 'string', description: '앱 아이디어 요약' } }, required: ['idea_summary'] },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'suggest_contact',
+      description: '수집한 명함 중에서 누구에게 연락할지 추천하고, 연락 팁/메시지 초안을 제안합니다. 연락하고 싶어, 컨택해보려고, 어떻게 말 걸지 등일 때 사용하세요.',
+      parameters: { type: 'object' as const, properties: { user_request: { type: 'string', description: '사용자의 요청 (예: 프로젝트 제안하고 싶어, 이 분한테 연락할게)' } }, required: ['user_request'] },
     },
   },
 ]
@@ -275,7 +382,7 @@ serve(async (req) => {
           agentLabel = '인재 추천'
           agentsUsed.add(agentLabel)
           const out = await runRecommendTalent(supabase, openaiKey, user.id, args.query ?? '')
-          recommendations = out.recommendations
+          recommendations.push(...out.recommendations)
           toolResult = out.summary
         } else if (name === 'suggest_idea') {
           agentLabel = '기획·아이디어'
@@ -293,6 +400,12 @@ serve(async (req) => {
             'You recommend technology stacks (frontend, backend, DB, deployment) for app ideas. Answer in Korean. Be specific (e.g. React, Node, Supabase).',
             args.idea_summary ?? ''
           )
+        } else if (name === 'suggest_contact') {
+          agentLabel = '컨택'
+          agentsUsed.add(agentLabel)
+          const out = await runSuggestContact(supabase, openaiKey, user.id, args.user_request ?? '')
+          recommendations.push(...out.recommendations)
+          toolResult = out.summary
         } else {
           agentLabel = '알 수 없음'
           toolResult = '알 수 없는 도구입니다.'

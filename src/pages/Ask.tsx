@@ -88,76 +88,144 @@ export default function Ask() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        <p className="text-center text-xs text-gray-400 mb-4">오케스트레이터 + 하위 에이전트 (인재·기획·기술)</p>
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex gap-3 mb-4 ${msg.type === 'user' ? 'flex-row-reverse' : ''}`}>
-            {msg.type === 'agent' && (
-              <div className="w-10 h-10 rounded-full bg-[#FFE4E0] flex items-center justify-center flex-shrink-0">
-                <span className="text-[#FF9C8F] text-lg">🤖</span>
+        <p className="text-center text-xs text-gray-400 mb-4">오케스트레이터 + 하위 에이전트 (인재·기획·기술·컨택)</p>
+        {messages.map((msg) => {
+          if (msg.type === 'user') {
+            return (
+              <div key={msg.id} className="flex gap-3 mb-4 flex-row-reverse">
+                <div className="flex-1 max-w-[85%] flex flex-col items-end">
+                  <p className="text-xs text-gray-400 mb-1">You</p>
+                  <div className="rounded-2xl px-4 py-3 bg-[#FF9C8F] text-white">
+                    <p className="text-sm">{msg.text}</p>
+                  </div>
+                </div>
               </div>
-            )}
-            <div className={`flex-1 max-w-[85%] ${msg.type === 'user' ? 'flex flex-col items-end' : ''}`}>
-              {msg.type === 'agent' && (
-                <p className="text-xs font-medium text-[#FF9C8F] mb-1">
-                  {msg.agentsUsed && msg.agentsUsed.length > 0
-                    ? `협업: ${msg.agentsUsed.join(' → ')}`
-                    : '오케스트레이터'}
-                </p>
-              )}
-              {msg.type === 'user' && (
-                <p className="text-xs text-gray-400 mb-1">You</p>
-              )}
-              <div
-                className={`rounded-2xl px-4 py-3 ${
-                  msg.type === 'user' ? 'bg-[#FF9C8F] text-white' : 'bg-white text-gray-900 shadow-sm border border-gray-100'
-                }`}
-              >
-                {msg.type === 'agent' && msg.agentResponses && msg.agentResponses.length > 0 && (
-                  <div className="space-y-3 mb-3">
-                    {msg.agentResponses.map((block, i) => (
-                      <div key={i} className="rounded-xl bg-[#FAF8F6] border border-[#FFE4E0] px-3 py-2.5">
-                        <p className="text-xs font-semibold text-[#FF9C8F] mb-1.5">{block.agent} 에이전트</p>
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{block.content}</p>
+            )
+          }
+
+          const hasDiscussion = msg.agentResponses && msg.agentResponses.length > 0
+          const agentCount = msg.agentsUsed?.length ?? 0
+
+          return (
+            <div key={msg.id} className="mb-6">
+              {hasDiscussion && agentCount > 0 && (
+                <div className="flex flex-col items-center mb-4">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    {[...Array(agentCount)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-10 h-10 rounded-full bg-[#FFE4E0] flex items-center justify-center flex-shrink-0 border-2 border-[#FF9C8F]"
+                      >
+                        <svg className="w-5 h-5 text-[#FF9C8F]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="4" y="10" width="16" height="10" rx="1" />
+                          <path d="M12 6V4M8 8h2M14 8h2" />
+                          <path d="M12 14v4M9 18h6" />
+                        </svg>
                       </div>
                     ))}
-                    <p className="text-xs text-gray-500 pt-1 border-t border-gray-100">↑ 위는 하위 에이전트들이 협업한 내용이에요.</p>
-                    <p className="text-sm font-medium text-gray-900">오케스트레이터 정리</p>
-                    <p className="text-sm mt-0.5">{msg.text}</p>
                   </div>
-                )}
-                {!(msg.type === 'agent' && msg.agentResponses && msg.agentResponses.length > 0) && (
-                  <p className="text-sm">{msg.text}</p>
-                )}
-                {msg.recommendations && msg.recommendations.length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    {msg.recommendations.map((r) => (
-                      <button
-                        key={r.card.id}
-                        type="button"
-                        onClick={() => setSelectedCard(r.card)}
-                        className="w-full flex items-center gap-3 p-3 bg-[#FAF8F6] hover:bg-[#FFE4E0]/50 rounded-xl text-left transition-colors"
-                      >
-                        <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#FFE4E0] flex-shrink-0">
-                          <img src={r.card.image_url} alt="" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 text-sm truncate">{r.card.card_name || 'My Card'}</p>
-                          <p className="text-xs text-[#FF9C8F] truncate">{r.card.custom_title || 'Professional'}</p>
-                          {r.reason && (
-                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{r.reason}</p>
-                          )}
-                        </div>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-gray-400">
-                          <polyline points="9 18 15 12 9 6" />
+                  <p className="text-sm font-medium text-[#FF9C8F] text-center px-4 py-2 rounded-full bg-[#FFE4E0]/60">
+                    {agentCount}명의 에이전트가 참여했어요. 토론 내용을 확인해보세요.
+                  </p>
+                </div>
+              )}
+
+              {hasDiscussion ? (
+                <div className="space-y-3">
+                  {msg.agentResponses!.map((block, i) => (
+                    <div key={i} className="flex gap-3">
+                      <div className="w-9 h-9 rounded-full bg-[#FFE4E0] flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-[#FF9C8F]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="4" y="10" width="16" height="10" rx="1" />
+                          <path d="M12 6V4M8 8h2M14 8h2" />
                         </svg>
-                      </button>
-                    ))}
+                      </div>
+                      <div className="flex-1 min-w-0 max-w-[85%]">
+                        <p className="text-xs font-semibold text-[#FF9C8F] uppercase tracking-wide mb-1">{block.agent} 에이전트</p>
+                        <div className="rounded-2xl px-4 py-3 bg-white text-gray-900 shadow-sm border border-gray-100">
+                          <p className="text-sm whitespace-pre-wrap">{block.content}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="flex gap-3 mt-4">
+                    <div className="w-9 h-9 rounded-full bg-[#FF9C8F] flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-xs font-bold">O</span>
+                    </div>
+                    <div className="flex-1 min-w-0 max-w-[85%]">
+                      <p className="text-xs font-semibold text-[#FF9C8F] uppercase tracking-wide mb-1">오케스트레이터 정리</p>
+                      <div className="rounded-2xl px-4 py-3 bg-white text-gray-900 shadow-sm border border-[#FFE4E0]">
+                        <p className="text-sm">{msg.text}</p>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  {msg.recommendations && msg.recommendations.length > 0 && (
+                    <div className="mt-4 pl-12 space-y-2">
+                      {msg.recommendations.map((r) => (
+                        <button
+                          key={r.card.id}
+                          type="button"
+                          onClick={() => setSelectedCard(r.card)}
+                          className="w-full flex items-center gap-3 p-3 bg-white hover:bg-[#FFE4E0]/30 rounded-xl text-left transition-colors border border-gray-100"
+                        >
+                          <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#FFE4E0] flex-shrink-0">
+                            <img src={r.card.image_url} alt="" className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{r.card.card_name || 'My Card'}</p>
+                            <p className="text-xs text-[#FF9C8F] truncate">{r.card.custom_title || 'Professional'}</p>
+                            {r.reason && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{r.reason}</p>}
+                          </div>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-gray-400">
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#FFE4E0] flex items-center justify-center flex-shrink-0">
+                    <span className="text-[#FF9C8F] text-lg">🤖</span>
+                  </div>
+                  <div className="flex-1 max-w-[85%]">
+                    <p className="text-xs font-medium text-[#FF9C8F] mb-1">오케스트레이터</p>
+                    <div className="rounded-2xl px-4 py-3 bg-white text-gray-900 shadow-sm border border-gray-100">
+                      <p className="text-sm">{msg.text}</p>
+                      {msg.recommendations && msg.recommendations.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          {msg.recommendations.map((r) => (
+                            <button
+                              key={r.card.id}
+                              type="button"
+                              onClick={() => setSelectedCard(r.card)}
+                              className="w-full flex items-center gap-3 p-3 bg-[#FAF8F6] hover:bg-[#FFE4E0]/50 rounded-xl text-left transition-colors"
+                            >
+                              <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#FFE4E0] flex-shrink-0">
+                                <img src={r.card.image_url} alt="" className="w-full h-full object-cover" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-gray-900 text-sm truncate">{r.card.card_name || 'My Card'}</p>
+                                <p className="text-xs text-[#FF9C8F] truncate">{r.card.custom_title || 'Professional'}</p>
+                                {r.reason && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{r.reason}</p>}
+                              </div>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-gray-400">
+                                <polyline points="9 18 15 12 9 6" />
+                              </svg>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
         {loading && (
           <div className="flex gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-[#FFE4E0] flex items-center justify-center flex-shrink-0">
