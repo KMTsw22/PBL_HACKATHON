@@ -1,13 +1,16 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useDiscoverCards } from '@/hooks/useDiscoverCards'
 import { useCollectedCards } from '@/hooks/useCollectedCards'
 import CardDetailModal from '@/components/CardDetailModal'
 import RateCollectModal from '@/components/RateCollectModal'
+import { getOrCreateDmConversation } from '@/lib/chat'
 import type { UserCard } from '@/hooks/useUserCards'
 import type { RateCollectData } from '@/components/RateCollectModal'
 
 export default function Find() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { cards, loading, fetchMore, hasMore, retry } = useDiscoverCards(user?.id ?? null)
   const { addCollect, collectedIds } = useCollectedCards(user?.id ?? null)
@@ -103,6 +106,7 @@ export default function Find() {
                 variant="inline"
                 onCollectWithRating={handleCollectWithRating}
                 isCollected={false}
+                onMessage={card.user_id !== user?.id ? async (c) => { const convId = await getOrCreateDmConversation(c.user_id); if (convId) navigate(`/chats/${convId}`) } : undefined}
                 showShareIconOnly
               />
             </div>

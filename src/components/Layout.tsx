@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { HomeIcon, CollectIcon, FindIcon, AskIcon, SettingsIcon } from './NavIcons'
+import { HomeIcon, CollectIcon, FindIcon, MessagesIcon, AskIcon, SettingsIcon } from './NavIcons'
 
 const navItems = [
   { to: '/', label: 'Home', Icon: HomeIcon },
   { to: '/collect', label: 'Collect', Icon: CollectIcon },
   { to: '/find', label: 'Find', Icon: FindIcon },
+  { to: '/chats', label: 'Messages', Icon: MessagesIcon },
   { to: '/ask', label: 'Ask', Icon: AskIcon },
   { to: '/settings', label: 'Settings', Icon: SettingsIcon },
 ]

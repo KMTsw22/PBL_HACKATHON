@@ -20,10 +20,11 @@ type Props = {
   showShareIconOnly?: boolean
   myRatings?: MyRatings | null
   onEditRatings?: () => void
+  onMessage?: (card: UserCard) => void
   variant?: 'modal' | 'inline'
 }
 
-export default function CardDetailModal({ card, isOpen, onClose, onEdit, onDelete, onCollect, onCollectWithRating, isCollected, collectLabelWhenCollected, showShareIconOnly, myRatings, onEditRatings, variant = 'modal' }: Props) {
+export default function CardDetailModal({ card, isOpen, onClose, onEdit, onDelete, onCollect, onCollectWithRating, isCollected, collectLabelWhenCollected, showShareIconOnly, myRatings, onEditRatings, onMessage, variant = 'modal' }: Props) {
   const [showShare, setShowShare] = useState(false)
   if (!isOpen) return null
 
@@ -108,6 +109,18 @@ export default function CardDetailModal({ card, isOpen, onClose, onEdit, onDelet
                     Collect
                   </>
                 )}
+              </button>
+            )}
+            {onMessage && (
+              <button
+                type="button"
+                onClick={() => { onClose?.(); onMessage(card) }}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#FF9C8F] text-white font-medium rounded-xl"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                연락하기
               </button>
             )}
             <button

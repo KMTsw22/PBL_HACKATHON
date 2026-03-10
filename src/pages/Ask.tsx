@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { askAgent, type AskAgentMessage, type AgentStep } from '@/lib/askAgent'
 import type { RecommendResult } from '@/lib/recommendFromCollected'
 import CardDetailModal from '@/components/CardDetailModal'
+import { getOrCreateDmConversation } from '@/lib/chat'
 import type { UserCard } from '@/hooks/useUserCards'
 
 const TYPING_INTERVAL_MS = 18
@@ -68,6 +70,7 @@ function useRevealAndTyping(lastMsgWithSteps: Message | null) {
 }
 
 export default function Ask() {
+  const navigate = useNavigate()
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -438,6 +441,10 @@ export default function Ask() {
           card={selectedCard}
           isOpen={true}
           onClose={() => setSelectedCard(null)}
+          onMessage={async (card) => {
+            const convId = await getOrCreateDmConversation(card.user_id)
+            if (convId) navigate(`/chats/${convId}`)
+          }}
           showShareIconOnly
         />
       )}

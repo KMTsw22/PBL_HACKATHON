@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useCollectedCards, type CollectedCard } from '@/hooks/useCollectedCards'
 import CardDetailModal from '@/components/CardDetailModal'
 import RateCollectModal from '@/components/RateCollectModal'
+import { getOrCreateDmConversation } from '@/lib/chat'
 
 export default function Collect() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { collected, loading, removeCollect, updateRatings } = useCollectedCards(user?.id ?? null)
   const [search, setSearch] = useState('')
@@ -118,6 +120,7 @@ export default function Collect() {
             }}
             isCollected={true}
             collectLabelWhenCollected="Remove"
+            onMessage={selectedItem.user_cards.user_id !== user?.id ? async (c) => { const convId = await getOrCreateDmConversation(c.user_id); if (convId) navigate(`/chats/${convId}`) } : undefined}
             showShareIconOnly
             myRatings={{
               scores: selectedItem.scores.map((s) => ({ category: s.category, score: s.score })),

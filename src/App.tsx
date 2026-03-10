@@ -5,6 +5,8 @@ import Login from '@/pages/Login'
 import Home from '@/pages/Home'
 import Collect from '@/pages/Collect'
 import Find from '@/pages/Find'
+import Chats from '@/pages/Chats'
+import ChatThread from '@/pages/ChatThread'
 import Ask from '@/pages/Ask'
 import Settings from '@/pages/Settings'
 
@@ -29,6 +31,8 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/collect" element={<Collect />} />
         <Route path="/find" element={<Find />} />
+        <Route path="/chats" element={<Chats />} />
+        <Route path="/chats/:conversationId" element={<ChatThread />} />
         <Route path="/ask" element={<Ask />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
