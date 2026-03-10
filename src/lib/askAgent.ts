@@ -3,10 +3,13 @@ import type { UserCard } from '@/hooks/useUserCards'
 
 export type AskAgentMessage = { role: 'user' | 'assistant'; content: string }
 
+export type AgentResponseBlock = { agent: string; content: string }
+
 export type AskAgentResponse = {
   message: string
   recommendations?: { card: UserCard; reason: string }[]
   agentsUsed?: string[]
+  agentResponses?: AgentResponseBlock[]
 }
 
 export async function askAgent(messages: AskAgentMessage[]): Promise<AskAgentResponse> {
@@ -23,11 +26,13 @@ export async function askAgent(messages: AskAgentMessage[]): Promise<AskAgentRes
     message?: string
     recommendations?: { card: UserCard; reason: string }[]
     agentsUsed?: string[]
+    agentResponses?: AgentResponseBlock[]
   }
 
   return {
     message: json.message ?? '',
     recommendations: json.recommendations,
     agentsUsed: json.agentsUsed,
+    agentResponses: json.agentResponses,
   }
 }

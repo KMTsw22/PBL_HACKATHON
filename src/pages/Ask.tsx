@@ -4,12 +4,15 @@ import type { RecommendResult } from '@/lib/recommendFromCollected'
 import CardDetailModal from '@/components/CardDetailModal'
 import type { UserCard } from '@/hooks/useUserCards'
 
+type AgentResponseBlock = { agent: string; content: string }
+
 type Message = {
   id: string
   type: 'user' | 'agent'
   text: string
   recommendations?: RecommendResult[]
   agentsUsed?: string[]
+  agentResponses?: AgentResponseBlock[]
 }
 
 export default function Ask() {
@@ -44,7 +47,7 @@ export default function Ask() {
       )
       history.push({ role: 'user', content: text })
 
-      const { message, recommendations, agentsUsed } = await askAgent(history)
+      const { message, recommendations, agentsUsed, agentResponses } = await askAgent(history)
       setMessages((prev) => [
         ...prev,
         {
@@ -53,6 +56,7 @@ export default function Ask() {
           text: message,
           recommendations,
           agentsUsed,
+          agentResponses,
         },
       ])
     } catch (e) {
@@ -96,7 +100,7 @@ export default function Ask() {
               {msg.type === 'agent' && (
                 <p className="text-xs font-medium text-[#FF9C8F] mb-1">
                   {msg.agentsUsed && msg.agentsUsed.length > 0
-                    ? `오케스트레이터 · ${msg.agentsUsed.join(', ')}`
+                    ? `협업: ${msg.agentsUsed.join(' → ')}`
                     : '오케스트레이터'}
                 </p>
               )}
@@ -108,7 +112,22 @@ export default function Ask() {
                   msg.type === 'user' ? 'bg-[#FF9C8F] text-white' : 'bg-white text-gray-900 shadow-sm border border-gray-100'
                 }`}
               >
-                <p className="text-sm">{msg.text}</p>
+                {msg.type === 'agent' && msg.agentResponses && msg.agentResponses.length > 0 && (
+                  <div className="space-y-3 mb-3">
+                    {msg.agentResponses.map((block, i) => (
+                      <div key={i} className="rounded-xl bg-[#FAF8F6] border border-[#FFE4E0] px-3 py-2.5">
+                        <p className="text-xs font-semibold text-[#FF9C8F] mb-1.5">{block.agent} 에이전트</p>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{block.content}</p>
+                      </div>
+                    ))}
+                    <p className="text-xs text-gray-500 pt-1 border-t border-gray-100">↑ 위는 하위 에이전트들이 협업한 내용이에요.</p>
+                    <p className="text-sm font-medium text-gray-900">오케스트레이터 정리</p>
+                    <p className="text-sm mt-0.5">{msg.text}</p>
+                  </div>
+                )}
+                {!(msg.type === 'agent' && msg.agentResponses && msg.agentResponses.length > 0) && (
+                  <p className="text-sm">{msg.text}</p>
+                )}
                 {msg.recommendations && msg.recommendations.length > 0 && (
                   <div className="mt-3 space-y-2">
                     {msg.recommendations.map((r) => (
