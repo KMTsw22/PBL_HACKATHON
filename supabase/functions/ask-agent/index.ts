@@ -70,6 +70,7 @@ async function runRecommendTalent(
     }
   })
 
+  console.log('[ask-agent] OpenAI 호출 #runRecommendTalent (인재 추천)')
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
@@ -165,6 +166,7 @@ async function runSuggestContact(
     }
   })
 
+  console.log('[ask-agent] OpenAI 호출 #runSuggestContact (컨택 추천)')
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
@@ -217,6 +219,7 @@ Suggest 1-3 people to contact. Order by relevance. outreachTip should be practic
 }
 
 async function callLlm(openaiKey: string, systemPrompt: string, userContent: string): Promise<string> {
+  console.log('[ask-agent] OpenAI 호출 #callLlm (기획·아이디어 또는 기술 스택)')
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
@@ -325,6 +328,7 @@ serve(async (req) => {
     const steps: Step[] = []
 
     for (let round = 0; round < 5; round++) {
+      console.log('[ask-agent] OpenAI 호출 #orchestrator', { round: round + 1 })
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
