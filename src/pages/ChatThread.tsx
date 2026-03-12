@@ -87,8 +87,14 @@ export default function ChatThread() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[#FAF8F6] pt-14">
-      <header className="fixed top-0 left-0 right-0 z-20 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 shadow-sm">
+    <div
+      className="min-h-screen h-screen flex flex-col bg-[#FAF8F6]"
+      style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
+    >
+      <header
+        className="fixed top-0 left-0 right-0 z-30 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 shadow-sm"
+        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+      >
         <button
           type="button"
           onClick={() => navigate(-1)}

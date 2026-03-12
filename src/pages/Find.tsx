@@ -13,8 +13,9 @@ export default function Find() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { cards, loading, fetchMore, hasMore, retry } = useDiscoverCards(user?.id ?? null)
-  const { addCollect, collectedIds } = useCollectedCardIds(user?.id ?? null)
+  const { addCollect, collectedIds, loading: collectedIdsLoading } = useCollectedCardIds(user?.id ?? null)
   const displayCards = cards.filter((card) => !collectedIds.has(card.id))
+  const waitForCollected = collectedIdsLoading
   const [rateCollectCard, setRateCollectCard] = useState<UserCard | null>(null)
 
   const handleCollectWithRating = useCallback((card: UserCard) => {
@@ -71,10 +72,10 @@ export default function Find() {
         <p className="text-sm text-gray-500">스크롤하여 더 보기</p>
       </header>
 
-      {displayCards.length === 0 && loading ? (
+      {waitForCollected || (displayCards.length === 0 && loading) ? (
         <div className="flex flex-col items-center justify-center py-20">
           <div className="w-10 h-10 border-2 border-[#FF9C8F] border-t-transparent rounded-full animate-spin" />
-          <p className="mt-4 text-sm text-gray-500">명함을 불러오는 중...</p>
+          <p className="mt-4 text-sm text-gray-500">{waitForCollected ? '수집 목록 확인 중...' : '명함을 불러오는 중...'}</p>
         </div>
       ) : displayCards.length === 0 && !hasMore ? (
         <div className="flex flex-col items-center justify-center py-20">
