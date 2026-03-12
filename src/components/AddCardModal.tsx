@@ -153,10 +153,10 @@ export default function AddCardModal({ isOpen, onClose, profile: _profile, userI
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={handleClose} aria-hidden />
-      <div className="relative w-full max-w-md bg-white rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white pt-2 pb-3 px-4 z-10">
+      <div className="relative w-full max-w-md flex flex-col bg-white rounded-t-2xl sm:rounded-2xl max-h-[calc(100dvh-5rem)] sm:max-h-[90vh]">
+        <div className="flex-shrink-0 bg-white pt-2 pb-3 px-4">
           <div className="w-8 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
           <div className="flex items-start gap-3 mb-4">
             <div className="w-8 h-8 rounded-full bg-[#FF9C8F] flex items-center justify-center flex-shrink-0">
@@ -168,7 +168,7 @@ export default function AddCardModal({ isOpen, onClose, profile: _profile, userI
           </div>
           <h2 className="text-lg font-bold text-gray-900">{initialCard ? 'Edit Card' : 'Add New Card'}</h2>
         </div>
-        <div className="px-6 pb-8 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-4 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-900 mb-1">Card Name</label>
             <input
@@ -320,7 +320,9 @@ export default function AddCardModal({ isOpen, onClose, profile: _profile, userI
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
 
+        <div className="flex-shrink-0 p-4 pt-2 border-t border-gray-100 bg-white pb-8">
           <button
             type="button"
             onClick={handleSave}

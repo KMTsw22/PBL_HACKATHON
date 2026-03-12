@@ -179,9 +179,9 @@ export default function RateCollectModal({ isOpen, onClose, card, initialData, o
   const isEditMode = !!initialData
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={handleClose} aria-hidden />
-      <div className="relative w-full max-w-md max-h-[90vh] flex flex-col bg-white rounded-t-2xl sm:rounded-2xl shadow-xl">
+      <div className="relative w-full max-w-md flex flex-col bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[calc(100dvh-5rem)] sm:max-h-[90vh]">
         <div className="flex-shrink-0 border-b border-gray-100 px-4 py-3 flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-900">Rate & Collect</h2>
           <button
@@ -193,7 +193,7 @@ export default function RateCollectModal({ isOpen, onClose, card, initialData, o
           </button>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 overscroll-contain">
           {/* Card preview */}
           <div className="flex gap-3 p-3 bg-[#FFE4E0]/50 rounded-xl">
             <div className="w-14 h-14 rounded-lg overflow-hidden bg-[#FFE4E0] flex-shrink-0">
@@ -288,7 +288,9 @@ export default function RateCollectModal({ isOpen, onClose, card, initialData, o
               className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm placeholder:text-gray-400 resize-none"
             />
           </div>
+        </div>
 
+        <div className="flex-shrink-0 p-4 pt-0 border-t border-gray-100 bg-white pb-8">
           <button
             type="button"
             onClick={handleSubmit}
