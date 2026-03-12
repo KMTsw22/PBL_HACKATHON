@@ -12,8 +12,10 @@ import type { RateCollectData } from '@/components/RateCollectModal'
 export default function Find() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { cards, loading, fetchMore, hasMore, retry } = useDiscoverCards(user?.id ?? null)
   const { addCollect, collectedIds, loading: collectedIdsLoading } = useCollectedCardIds(user?.id ?? null)
+  const { cards, loading, fetchMore, hasMore, retry } = useDiscoverCards(user?.id ?? null, collectedIds, {
+    collectedReady: !collectedIdsLoading,
+  })
   const displayCards = cards.filter((card) => !collectedIds.has(card.id))
   const waitForCollected = collectedIdsLoading
   const [rateCollectCard, setRateCollectCard] = useState<UserCard | null>(null)
