@@ -181,7 +181,7 @@ export default function RateCollectModal({ isOpen, onClose, card, initialData, o
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/50" onClick={handleClose} aria-hidden />
-      <div className="relative w-full max-w-md flex flex-col bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[calc(100dvh-5rem)] sm:max-h-[90vh]">
+      <div className="relative w-full max-w-md flex flex-col bg-white rounded-2xl overflow-hidden shadow-xl max-h-[calc(100dvh-5rem)] sm:max-h-[90vh]">
         <div className="flex-shrink-0 border-b border-gray-100 px-4 py-3 flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-900">Rate & Collect</h2>
           <button

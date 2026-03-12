@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useNavVisibility } from '@/contexts/NavVisibilityContext'
 import { useCollectedCards, type CollectedCard } from '@/hooks/useCollectedCards'
 import CardDetailModal from '@/components/CardDetailModal'
 import { CardImage } from '@/components/CardImage'
@@ -14,6 +15,12 @@ export default function Collect() {
   const [search, setSearch] = useState('')
   const [selectedItem, setSelectedItem] = useState<CollectedCard | null>(null)
   const [showEditRatings, setShowEditRatings] = useState(false)
+  const { setHideNav } = useNavVisibility()
+
+  useEffect(() => {
+    setHideNav(showEditRatings)
+    return () => setHideNav(false)
+  }, [showEditRatings, setHideNav])
 
   const filtered = collected.filter((c) => {
     if (!c.user_cards) return false
@@ -158,13 +165,13 @@ export default function Collect() {
               scores: selectedItem.scores.map((s) => ({ category: s.category, score: s.score })),
               privateNotes: selectedItem.private_notes,
             }}
-            onEditRatings={() => setShowEditRatings(true)}
+            onEditRatings={() => { setHideNav(true); setShowEditRatings(true) }}
           />
           {showEditRatings && (
             <RateCollectModal
               key={selectedItem.id}
               isOpen={true}
-              onClose={() => setShowEditRatings(false)}
+              onClose={() => { setHideNav(false); setShowEditRatings(false) }}
               card={selectedItem.user_cards}
               initialData={{
                 scores: selectedItem.scores.map((s) => ({ category: s.category, score: s.score })),
@@ -184,6 +191,7 @@ export default function Collect() {
                       }
                     : null
                 )
+                setHideNav(false)
                 setShowEditRatings(false)
               }}
             />

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useNavVisibility } from '@/contexts/NavVisibilityContext'
 import { useDiscoverCards } from '@/hooks/useDiscoverCards'
 import { useCollectedCardIds } from '@/hooks/useCollectedCardIds'
 import CardDetailModal from '@/components/CardDetailModal'
@@ -18,6 +19,7 @@ export default function Find() {
   const displayCards = cards.filter((card) => !collectedIds.has(card.id))
   const [rateCollectCard, setRateCollectCard] = useState<UserCard | null>(null)
   const prevPathnameRef = useRef('')
+  const { setHideNav } = useNavVisibility()
 
   // 디버깅: /find 상태
   useEffect(() => {
@@ -43,8 +45,14 @@ export default function Find() {
   }, [location.pathname, user?.id, refetchCollectedIds, retry, cards.length])
 
   const handleCollectWithRating = useCallback((card: UserCard) => {
+    setHideNav(true)
     setRateCollectCard(card)
-  }, [])
+  }, [setHideNav])
+
+  useEffect(() => {
+    setHideNav(!!rateCollectCard)
+    return () => setHideNav(false)
+  }, [rateCollectCard, setHideNav])
 
   const handleRateCollectSubmit = useCallback(
     async (data: RateCollectData) => {
@@ -53,9 +61,10 @@ export default function Find() {
         privateNotes: data.privateNotes,
         scores: data.scores.map((s) => ({ category: s.category, score: s.score, isAiSuggested: s.isAiSuggested })),
       })
+      setHideNav(false)
       setRateCollectCard(null)
     },
-    [rateCollectCard, addCollect]
+    [rateCollectCard, addCollect, setHideNav]
   )
   const sentinelRef = useRef<HTMLDivElement>(null)
 
@@ -157,7 +166,7 @@ export default function Find() {
       {rateCollectCard && (
         <RateCollectModal
           isOpen={!!rateCollectCard}
-          onClose={() => setRateCollectCard(null)}
+          onClose={() => { setHideNav(false); setRateCollectCard(null) }}
           card={rateCollectCard}
           onSubmit={handleRateCollectSubmit}
         />

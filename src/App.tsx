@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { NavVisibilityProvider } from '@/contexts/NavVisibilityContext'
 import Layout from '@/components/Layout'
 import Login from '@/pages/Login'
 import Home from '@/pages/Home'
@@ -26,17 +27,19 @@ export default function App() {
   }
 
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/collect" element={<Collect />} />
-        <Route path="/find" element={<Find />} />
-        <Route path="/chats" element={<Chats />} />
-        <Route path="/chats/:conversationId" element={<ChatThread />} />
-        <Route path="/ask" element={<Ask />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Layout>
+    <NavVisibilityProvider>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/collect" element={<Collect />} />
+          <Route path="/find" element={<Find />} />
+          <Route path="/chats" element={<Chats />} />
+          <Route path="/chats/:conversationId" element={<ChatThread />} />
+          <Route path="/ask" element={<Ask />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Layout>
+    </NavVisibilityProvider>
   )
 }

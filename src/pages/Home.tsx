@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useProfile } from '@/hooks/useProfile'
 import { useUserCards, type UserCard } from '@/hooks/useUserCards'
 import { useCardStats } from '@/hooks/useCardStats'
+import { useNavVisibility } from '@/contexts/NavVisibilityContext'
 import AddCardModal, { type AddCardData } from '@/components/AddCardModal'
 import CardDetailModal from '@/components/CardDetailModal'
 import { CardImage } from '@/components/CardImage'
@@ -20,6 +21,13 @@ export default function Home() {
   const [selectedCardIndex, setSelectedCardIndex] = useState(0)
   const [detailCard, setDetailCard] = useState<UserCard | null>(null)
   const [slideOutIndex, setSlideOutIndex] = useState<number | null>(null)
+  const { setHideNav } = useNavVisibility()
+  const isAddCardModalOpen = modalOpen || !!editCard
+
+  useEffect(() => {
+    setHideNav(isAddCardModalOpen)
+    return () => setHideNav(false)
+  }, [isAddCardModalOpen, setHideNav])
 
   useEffect(() => {
     if (cards.length > 0 && selectedCardIndex >= cards.length) {
@@ -221,7 +229,7 @@ export default function Home() {
         <div className="mt-4 flex flex-col gap-2">
           <button
             type="button"
-            onClick={() => setModalOpen(true)}
+            onClick={() => { setHideNav(true); setModalOpen(true) }}
             className="w-full flex items-center justify-center gap-2 bg-[#FF9C8F] text-white font-medium py-3 rounded-xl"
           >
             <span>+</span> Add New Card
@@ -266,6 +274,7 @@ export default function Home() {
       <AddCardModal
         isOpen={modalOpen || !!editCard}
         onClose={() => {
+          setHideNav(false)
           setModalOpen(false)
           setEditCard(null)
         }}

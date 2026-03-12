@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useNavVisibility } from '@/contexts/NavVisibilityContext'
 import { HomeIcon, CollectIcon, FindIcon, MessagesIcon, AskIcon, SettingsIcon } from './NavIcons'
 
 const navItems = [
@@ -11,11 +12,17 @@ const navItems = [
 ]
 
 export default function Layout({ children }: { children?: React.ReactNode }) {
+  const location = useLocation()
+  const { hideNav } = useNavVisibility()
+  const isAskPage = location.pathname === '/ask'
+  const showNav = !hideNav && !isAskPage
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF8F6]">
-      <main className="flex-1 min-h-0 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]">
+      <main className={`flex-1 min-h-0 overflow-y-auto ${showNav ? 'pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))]' : 'pb-4'}`}>
         {children ?? <Outlet />}
       </main>
+      {showNav && (
       <nav className="fixed bottom-0 left-0 right-0 z-50 h-14 min-h-[56px] bg-[#F8F8F8] border-t border-gray-200 flex justify-around items-center py-2 safe-area-pb shadow-[0_-1px_6px_rgba(0,0,0,0.06)]">
         {navItems.map(({ to, label, Icon }) => (
           <NavLink
@@ -34,6 +41,7 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
           </NavLink>
         ))}
       </nav>
+      )}
     </div>
   )
 }
