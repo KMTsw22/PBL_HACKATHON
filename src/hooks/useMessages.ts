@@ -26,6 +26,7 @@ export function useMessages(conversationId: string | null, userId: string | null
       .order('created_at', { ascending: true })
 
     if (error) {
+      console.error('[useMessages] fetch', error.message, error.details)
       setMessages([])
     } else {
       setMessages((data as MessageRow[]) ?? [])
@@ -63,7 +64,9 @@ export function useMessages(conversationId: string | null, userId: string | null
         sender_id: userId,
         content: content.trim(),
       })
-      if (!error) {
+      if (error) {
+        console.error('[useMessages] send', error.message, error.details)
+      } else {
         fetchMessages()
       }
     },

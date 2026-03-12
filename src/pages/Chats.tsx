@@ -94,8 +94,9 @@ export default function Chats() {
                       onClick={() => handleStartChat(card.user_id)}
                       className="flex-shrink-0 flex flex-col items-center gap-2"
                     >
-                      <div className="w-14 h-14 rounded-full overflow-hidden bg-[#FFE4E0] border-2 border-white shadow-sm">
+                      <div className="relative w-14 h-14 rounded-full overflow-hidden bg-[#FFE4E0] border-2 border-white shadow-sm">
                         <img src={card.image_url} alt="" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white" aria-hidden />
                       </div>
                       <span className="text-xs font-medium text-gray-800 max-w-[72px] truncate">
                         {card.card_name || 'Card'}
@@ -141,8 +142,15 @@ export default function Chats() {
                         {conv.last_message?.content ?? 'No messages yet'}
                       </p>
                     </div>
-                    <div className="flex-shrink-0 text-right">
-                      <span className="text-xs text-gray-400 block">{formatTime(conv.updated_at)}</span>
+                    <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                      {conv.last_message && conv.last_message.sender_id !== user?.id ? (
+                        <>
+                          <span className="text-xs font-semibold text-[#FF9C8F]">{formatTime(conv.updated_at)}</span>
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#FF9C8F] flex-shrink-0" aria-hidden />
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-400">{formatTime(conv.updated_at)}</span>
+                      )}
                     </div>
                   </button>
                 </li>

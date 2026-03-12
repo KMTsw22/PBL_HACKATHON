@@ -18,12 +18,21 @@ export default function Home() {
   const [editCard, setEditCard] = useState<UserCard | null>(null)
   const [selectedCardIndex, setSelectedCardIndex] = useState(0)
   const [detailCard, setDetailCard] = useState<UserCard | null>(null)
+  const [slideOutIndex, setSlideOutIndex] = useState<number | null>(null)
 
   useEffect(() => {
     if (cards.length > 0 && selectedCardIndex >= cards.length) {
       setSelectedCardIndex(0)
     }
   }, [cards.length, selectedCardIndex])
+
+  const goToNextCard = () => {
+    if (cards.length <= 1) return
+    const next = (selectedCardIndex + 1) % cards.length
+    setSlideOutIndex(selectedCardIndex)
+    setSelectedCardIndex(next)
+    setTimeout(() => setSlideOutIndex(null), 480)
+  }
 
   useEffect(() => {
     const cardId = searchParams.get('card')
@@ -67,36 +76,6 @@ export default function Home() {
     }
   }
 
-  const handleAddTestCard = async () => {
-    const testCards = [
-      {
-        card_name: '테스트 카드 A',
-        description: '개발용 테스트 카드입니다. 저장·표시 확인용.',
-        custom_title: 'Product Strategist',
-        custom_content: 'AI, Networking',
-        image_url: 'https://picsum.photos/400/533?random=' + Date.now(),
-        portfolio_url: null,
-        email: null,
-        kakao_id: null,
-        phone: null,
-      },
-      {
-        card_name: '테스트 카드 B',
-        description: '두 번째 테스트 카드. 여러 카드 전환 테스트용.',
-        custom_title: 'Senior AI Architect',
-        custom_content: 'Cloud, DevOps',
-        image_url: 'https://picsum.photos/400/533?random=' + (Date.now() + 1),
-        portfolio_url: null,
-        email: null,
-        kakao_id: null,
-        phone: null,
-      },
-    ]
-    const card = testCards[Math.floor(Math.random() * testCards.length)]!
-    await addCard(card)
-    refetch()
-  }
-
   const loading = profileLoading || cardsLoading
   if (loading) {
     return (
@@ -106,18 +85,44 @@ export default function Home() {
     )
   }
 
+  const greeting = (() => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 18) return 'Good afternoon'
+    return 'Good evening'
+  })()
+  const firstName = displayName.split(/\s/)[0] || displayName
+
   return (
-    <div className="min-h-full bg-[#FAF8F6] px-4 pt-6 pb-8">
-      <header className="flex flex-col items-center mb-6">
-        <div className="w-20 h-20 rounded-full bg-white border-2 border-[#FF9C8F]/30 flex items-center justify-center overflow-hidden">
-          {profile?.photo_url ? (
-            <img src={profile.photo_url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-4xl">🤖</span>
-          )}
+    <div className="min-h-full bg-[#FAF8F6] px-4 pb-8">
+      <header className="pt-6 pb-4">
+        <div className="flex flex-col items-center">
+          <div className="flex items-center justify-center gap-3 w-full max-w-sm">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
+              <h1 className="text-xl font-bold text-gray-800">My Networking Agent</h1>
+              <button type="button" className="p-1 rounded-full hover:bg-[#FFE4E0]/50 text-[#FF9C8F] flex-shrink-0" aria-label="More">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </div>
+            <div className="w-12 h-12 rounded-full bg-[#FFE4E0] border-2 border-[#FF9C8F]/30 flex items-center justify-center overflow-hidden shadow-sm flex-shrink-0">
+              {profile?.photo_url ? (
+                <img src={profile.photo_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xl font-bold text-[#FF9C8F]">
+                  {(profile?.name || user?.user_metadata?.full_name || user?.user_metadata?.name || '?').charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+          </div>
+          <p className="text-sm text-gray-500 mt-2">Your digital twin is active</p>
+          <div className="mt-4 w-full max-w-sm">
+            <p className="text-sm text-gray-700 bg-[#FFE4E0]/60 rounded-2xl px-4 py-3 border border-[#FF9C8F]/20">
+              {greeting}, {firstName}! You have 3 new potential matches today. ✨
+            </p>
+          </div>
         </div>
-        <h1 className="text-xl font-bold text-gray-800 mt-3">My Networking Agent</h1>
-        <p className="text-sm text-gray-500">Your digital twin is active</p>
       </header>
 
       <section className="mb-8">
@@ -126,45 +131,72 @@ export default function Home() {
         </h2>
         {cards.length > 0 ? (
           (() => {
+            const nextIndex = (selectedCardIndex + 1) % cards.length
+            const hasNext = cards.length > 1
             const mainCard = cards[selectedCardIndex]!
-            const nextCard = cards[(selectedCardIndex + 1) % cards.length]
-            return (
-          <div className="relative flex -mx-4 justify-center items-start">
-            <div
-              className={`cursor-pointer ${nextCard ? 'flex-1 min-w-0 max-w-[280px]' : 'w-full max-w-[280px]'} px-4`}
-              onClick={() => setDetailCard(mainCard)}
-            >
-              <div className="relative overflow-hidden rounded-2xl shadow-lg aspect-[3/4] max-h-80 mx-auto">
-                <img
-                  src={mainCard.image_url}
-                  alt={mainCard.card_name || 'AI Card'}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                  <p className="text-white font-bold text-lg">{mainCard.card_name || 'My Card'}</p>
-                  <p className="text-white/90 text-sm">{mainCard.custom_title || 'Professional'}</p>
-                  <p className="text-white/80 text-xs mt-1">Active • 1.2k scans</p>
-                </div>
-                <div className="absolute top-3 right-3 flex gap-2">
-                  <span className="text-white drop-shadow">📶</span>
-                  <span className="text-white drop-shadow">📱</span>
+            const isAnimating = slideOutIndex !== null
+            const leavingIndex = slideOutIndex ?? selectedCardIndex
+
+            const renderCard = (card: UserCard, animClass: string) => (
+              <div
+                key={card.id}
+                className={`absolute inset-0 cursor-pointer ${animClass}`}
+                onClick={() => !isAnimating && setDetailCard(card)}
+              >
+                <div className="relative w-full h-full rounded-2xl shadow-lg overflow-hidden">
+                  <img
+                    src={card.image_url}
+                    alt={card.card_name || 'AI Card'}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+                    <p className="text-white font-bold text-lg">{card.card_name || 'My Card'}</p>
+                    <p className="text-white/90 text-sm">{card.custom_title || 'Professional'}</p>
+                    <p className="text-white/80 text-xs mt-1">Active • 1.2k scans</p>
+                  </div>
+                  <div className="absolute top-3 right-3 flex gap-2">
+                    <span className="text-white drop-shadow">📶</span>
+                    <span className="text-white drop-shadow">📱</span>
+                  </div>
                 </div>
               </div>
+            )
+
+            return (
+          <div className="relative flex px-4 justify-center items-stretch gap-0">
+            <div
+              className={`relative z-20 isolate ${hasNext ? 'flex-1 min-w-0 max-w-[340px] pr-0' : 'w-full max-w-[340px]'} flex justify-center`}
+            >
+              <div className="relative w-full aspect-[3/4] max-h-[420px] min-h-[280px] overflow-hidden rounded-2xl bg-[#FAF8F6]">
+                {!isAnimating && renderCard(mainCard, '')}
+                {isAnimating && (
+                  <>
+                    {renderCard(
+                      cards[leavingIndex]!,
+                      'animate-card-out z-0'
+                    )}
+                    {renderCard(
+                      cards[selectedCardIndex]!,
+                      'animate-card-in z-10'
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-            {nextCard && (
-              <div className="flex-shrink-0 w-14 sm:w-16 -ml-3">
+            {hasNext && (
+              <div className="w-6 flex-shrink-0 overflow-hidden self-stretch min-h-0 relative -ml-2 z-10">
                 <button
                   type="button"
-                  onClick={() => setSelectedCardIndex((selectedCardIndex + 1) % cards.length)}
-                  className="block w-full focus:outline-none focus:ring-2 focus:ring-[#FF9C8F] focus:ring-offset-2 rounded-xl overflow-hidden"
+                  onClick={goToNextCard}
+                  className="absolute inset-0 focus:outline-none focus:ring-2 focus:ring-[#FF9C8F] focus:ring-offset-2 rounded-r-2xl"
                 >
-                  <div className="relative overflow-hidden rounded-xl shadow-md aspect-[3/4] border-2 border-white">
+                  <div className="absolute right-0 top-0 h-full aspect-[3/4] overflow-hidden rounded-2xl shadow-md border border-white border-l-0 opacity-60">
                     <img
-                      src={nextCard.image_url}
-                      alt={nextCard.card_name || 'AI Card'}
+                      src={cards[nextIndex]!.image_url}
+                      alt={cards[nextIndex]!.card_name || 'AI Card'}
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute inset-0 bg-black/30" />
+                    <div className="absolute inset-0 bg-white/20" />
                   </div>
                 </button>
               </div>
@@ -173,7 +205,7 @@ export default function Home() {
             )
           })()
         ) : (
-          <div className="relative overflow-hidden rounded-2xl shadow-lg aspect-[3/4] max-h-80 max-w-[280px] mx-auto bg-[#FF9C8F] p-6 text-white flex flex-col justify-between">
+          <div className="relative overflow-hidden rounded-2xl shadow-lg aspect-[3/4] max-h-[420px] min-h-[280px] max-w-[340px] mx-auto bg-[#FF9C8F] p-6 text-white flex flex-col justify-between">
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-xl font-bold">{displayName}</h3>
@@ -198,15 +230,6 @@ export default function Home() {
           >
             <span>+</span> Add New Card
           </button>
-          {import.meta.env.DEV && (
-            <button
-              type="button"
-              onClick={handleAddTestCard}
-              className="w-full flex items-center justify-center gap-2 border border-amber-400 text-amber-700 text-sm py-2 rounded-xl hover:bg-amber-50"
-            >
-              🧪 테스트 카드 추가 (개발용)
-            </button>
-          )}
         </div>
       </section>
 

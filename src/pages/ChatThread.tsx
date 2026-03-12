@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useMessages } from '@/hooks/useMessages'
 import { useState } from 'react'
@@ -10,9 +10,11 @@ type OtherUser = { id: string; name: string | null; photo_url: string | null }
 export default function ChatThread() {
   const { conversationId } = useParams<{ conversationId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
   const { messages, loading, sendMessage } = useMessages(conversationId ?? null, user?.id ?? null)
-  const [input, setInput] = useState('')
+  const draftFromState = (location.state as { draft?: string } | null)?.draft
+  const [input, setInput] = useState(() => draftFromState ?? '')
   const [otherUser, setOtherUser] = useState<OtherUser | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -23,13 +25,21 @@ export default function ChatThread() {
   useEffect(() => {
     if (!conversationId || !user?.id) return
     const load = async () => {
-      const { data: participants } = await supabase
+      const { data: participants, error: participantsError } = await supabase
         .from('conversation_participants')
         .select('user_id')
         .eq('conversation_id', conversationId)
+      if (participantsError) {
+        console.error('[ChatThread] participants', participantsError.message, participantsError.details)
+        return
+      }
       const otherId = (participants ?? []).find((p) => p.user_id !== user.id)?.user_id
       if (!otherId) return
-      const { data: profile } = await supabase.from('profiles').select('id, name, photo_url').eq('id', otherId).single()
+      const { data: profile, error: profileError } = await supabase.from('profiles').select('id, name, photo_url').eq('id', otherId).single()
+      if (profileError) {
+        console.error('[ChatThread] profile', profileError.message, profileError.details)
+        return
+      }
       if (profile) setOtherUser({ id: profile.id, name: profile.name, photo_url: profile.photo_url })
     }
     load()
@@ -52,7 +62,7 @@ export default function ChatThread() {
 
   return (
     <div className="h-screen flex flex-col bg-[#FAF8F6]">
-      <header className="flex-shrink-0 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100">
+      <header className="flex-shrink-0 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 shadow-sm">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -75,7 +85,7 @@ export default function ChatThread() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-900 truncate">{otherUser?.name || 'Loading...'}</p>
-          <p className="text-xs text-gray-500">Active recently</p>
+          <p className="text-xs text-gray-500">Active 5m ago</p>
         </div>
         <button type="button" className="p-2 rounded-full hover:bg-gray-100 text-gray-600" aria-label="Video call">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -92,7 +102,7 @@ export default function ChatThread() {
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-24 space-y-3">
         {loading ? (
           <div className="flex justify-center py-8">
             <div className="w-8 h-8 border-2 border-[#FF9C8F] border-t-transparent rounded-full animate-spin" />
@@ -124,7 +134,7 @@ export default function ChatThread() {
                   </div>
                   <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>
                     <div
-                      className={`rounded-2xl px-4 py-2.5 ${
+                      className={`rounded-2xl px-4 py-2.5 shadow-sm ${
                         isMe ? 'bg-[#FF9C8F] text-white rounded-br-md' : 'bg-gray-200 text-gray-900 rounded-bl-md'
                       }`}
                     >
@@ -137,34 +147,46 @@ export default function ChatThread() {
                 </div>
               )
             })}
-            {messages.length > 0 && messages.length % 4 === 0 && (
-              <div className="rounded-2xl bg-[#FFE4E0]/60 border border-[#FF9C8F]/20 p-4 my-4">
-                <p className="text-xs font-bold text-[#FF9C8F] uppercase tracking-wide flex items-center gap-2 mb-2">
-                  <span className="w-5 h-5 rounded bg-[#FF9C8F]/20 flex items-center justify-center text-[#FF9C8F]">◆</span>
-                  Agent Insights
-                </p>
-                <p className="text-sm text-gray-700 mb-3">
-                  Keep the conversation going. Ask about their work or suggest a coffee chat.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#FF9C8F] text-white text-sm font-medium"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                      <line x1="16" y1="2" x2="16" y2="6" />
-                      <line x1="8" y1="2" x2="8" y2="6" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                    Suggest Meetup
-                  </button>
-                  <button
-                    type="button"
-                    className="px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-sm font-medium"
-                  >
-                    Details
-                  </button>
+            {messages.length >= 2 && (
+              <div className="rounded-2xl bg-[#FFE4E0]/80 border border-[#FF9C8F]/25 shadow-sm p-4 my-4 flex gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold text-[#FF9C8F] uppercase tracking-wider flex items-center gap-2 mb-2">
+                    <span className="w-5 h-5 rounded bg-[#FF9C8F]/25 flex items-center justify-center text-[#FF9C8F] text-[10px]">◆</span>
+                    Agent Insights
+                  </p>
+                  <p className="text-sm text-gray-700 mb-3">
+                    Keep the conversation going. Ask about their work or suggest a coffee chat.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[#FF9C8F] text-white text-sm font-medium shadow-sm hover:bg-[#f08a7d] transition-colors"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      Suggest Meetup
+                    </button>
+                    <button
+                      type="button"
+                      className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 16v-4M12 8h.01" />
+                      </svg>
+                      Details
+                    </button>
+                  </div>
+                </div>
+                <div className="w-16 h-16 rounded-xl flex-shrink-0 overflow-hidden bg-gradient-to-br from-[#FF9C8F]/30 to-[#FFE4E0] flex items-center justify-center">
+                  <svg className="w-8 h-8 text-[#FF9C8F]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M3 9h18M9 21V9" />
+                  </svg>
                 </div>
               </div>
             )}
@@ -173,10 +195,10 @@ export default function ChatThread() {
         )}
       </div>
 
-      <footer className="flex-shrink-0 flex items-center gap-2 px-4 py-3 bg-white border-t border-gray-100">
+      <footer className="fixed bottom-[56px] left-0 right-0 flex items-center gap-2 px-4 py-3 bg-white border-t border-gray-100 shadow-[0_-1px_4px_rgba(0,0,0,0.04)]">
         <button
           type="button"
-          className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50"
+          className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
           aria-label="Attach"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -185,16 +207,19 @@ export default function ChatThread() {
           </svg>
         </button>
         <input
+          id="chat-message-input"
+          name="chatMessage"
           type="text"
           placeholder="Type a message..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
-          className="flex-1 rounded-full bg-gray-100 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#FF9C8F]/30 placeholder:text-gray-400"
+          className="flex-1 rounded-full bg-gray-100 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#FF9C8F]/30 focus:bg-white placeholder:text-gray-400 transition-shadow"
+          aria-label="메시지 입력"
         />
         <button
           type="button"
-          className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200"
+          className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors"
           aria-label="Emoji"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
 const getRedirectUrl = () => {
@@ -7,18 +8,44 @@ const getRedirectUrl = () => {
 }
 
 export default function Login() {
+  const [error, setError] = useState<string | null>(null)
+
+  // 카카오/Google 로그인 후 리다이렉트돼 왔을 때 URL 해시(#access_token 등)에서 세션 복구
+  useEffect(() => {
+    const hash = window.location.hash
+    if (!hash) return
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        // 해시 제거 후 깔끔한 URL로 (세션은 이미 저장됨)
+        window.history.replaceState(null, '', window.location.pathname + window.location.search)
+      }
+    })
+  }, [])
+
   const handleKakaoLogin = async () => {
-    await supabase.auth.signInWithOAuth({
+    setError(null)
+    const { data, error: err } = await supabase.auth.signInWithOAuth({
       provider: 'kakao',
       options: { redirectTo: getRedirectUrl() },
     })
+    if (err) {
+      setError(err.message || '카카오 로그인에 실패했어요.')
+      return
+    }
+    if (data?.url) window.location.href = data.url
   }
 
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
+    setError(null)
+    const { data, error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: getRedirectUrl() },
     })
+    if (err) {
+      setError(err.message || 'Google 로그인에 실패했어요.')
+      return
+    }
+    if (data?.url) window.location.href = data.url
   }
 
   return (
@@ -51,6 +78,14 @@ export default function Login() {
           Agent
         </h1>
         <p className="text-gray-500 text-sm mt-2 mb-12">스마트한 인맥 관리를 시작해보세요</p>
+        {error && (
+          <div className="w-full max-w-sm mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            {error}
+            <p className="mt-2 text-xs text-red-600">
+              Supabase 대시보드 → Authentication → Providers에서 카카오가 켜져 있는지, 카카오 개발자 콘솔에 Redirect URI가 <code className="bg-red-100 px-1 rounded">https://&lt;프로젝트&gt;.supabase.co/auth/v1/callback</code> 로 등록되어 있는지 확인해보세요. 로그인 후 앱으로 안 넘어가면 Authentication → URL Configuration에서 <strong>Redirect URLs</strong>에 현재 접속 주소(예: <code className="bg-red-100 px-1 rounded">http://localhost:5173/**</code>)를 추가하세요.
+            </p>
+          </div>
+        )}
         <div className="w-full max-w-sm space-y-3">
           <button
             type="button"

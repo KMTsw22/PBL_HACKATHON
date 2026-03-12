@@ -78,7 +78,7 @@ export default function Collect() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {filtered.map((item) => {
             const card = item.user_cards
             if (!card) return null

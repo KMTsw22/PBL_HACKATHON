@@ -92,7 +92,7 @@ export default function Find() {
           </button>
         </div>
       ) : (
-        <div className="space-y-4 pb-8">
+        <div className="space-y-6 pb-8">
           {displayCards.length === 0 && hasMore && (
             <div className="py-12 text-center text-sm text-gray-500">
               수집한 명함을 제외하고 불러오는 중...

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useProfile } from '@/hooks/useProfile'
 import { supabase } from '@/lib/supabase'
@@ -5,9 +6,32 @@ import { supabase } from '@/lib/supabase'
 export default function Settings() {
   const { user } = useAuth()
   const { profile } = useProfile(user)
+  const [collecting, setCollecting] = useState(false)
+  const [collectMessage, setCollectMessage] = useState<string | null>(null)
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
+  }
+
+  const handleCollectAllSeedCards = async () => {
+    if (!user) return
+    setCollectMessage(null)
+    setCollecting(true)
+    try {
+      const { data } = await supabase.rpc('collect_all_seed_cards')
+      const result = data as { ok?: boolean; error?: string; collected_count?: number; newly_inserted?: number } | null
+      if (result?.ok) {
+        setCollectMessage(
+          `수집 완료. 총 ${result.collected_count ?? 0}장 보유, 이번에 ${result.newly_inserted ?? 0}장 추가됐어요.`
+        )
+      } else {
+        setCollectMessage(result?.error ?? '수집에 실패했어요.')
+      }
+    } catch (e) {
+      setCollectMessage(e instanceof Error ? e.message : '수집 중 오류가 났어요.')
+    } finally {
+      setCollecting(false)
+    }
   }
 
   const displayName = profile?.name || user?.user_metadata?.full_name || user?.user_metadata?.user_name || 'John Doe'
@@ -55,7 +79,9 @@ export default function Settings() {
           {profile?.photo_url ? (
             <img src={profile.photo_url} alt="" className="w-full h-full object-cover" />
           ) : (
-            <span className="text-2xl">🤖</span>
+            <span className="text-2xl font-bold text-[#FF9C8F]">
+              {(displayName || '?').charAt(0).toUpperCase()}
+            </span>
           )}
         </div>
         <div className="flex-1">
@@ -71,6 +97,32 @@ export default function Settings() {
           Edit Profile
         </button>
       </div>
+
+      <section className="mb-6">
+        <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">데모 · 체험</h2>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={handleCollectAllSeedCards}
+            disabled={collecting || !user}
+            className="w-full flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-100 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <span className="text-gray-600">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+              </svg>
+            </span>
+            <div className="flex-1 text-left">
+              <p className="font-medium text-gray-900">전체 명함 한 번에 수집</p>
+              <p className="text-sm text-gray-500">수집 가능한 모든 데모 명함을 내 수집함에 추가 (Ask·추천 체험용)</p>
+            </div>
+            {collecting ? <span className="text-sm text-gray-500">처리 중...</span> : null}
+          </button>
+          {collectMessage && (
+            <p className="text-sm px-4 py-2 rounded-lg bg-[#FFE4E0]/50 text-gray-700">{collectMessage}</p>
+          )}
+        </div>
+      </section>
 
       <section className="mb-6">
         <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">Account</h2>

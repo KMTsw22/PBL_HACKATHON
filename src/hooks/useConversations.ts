@@ -17,7 +17,13 @@ export function useConversations(userId: string | null) {
       .select('id, updated_at')
       .order('updated_at', { ascending: false })
 
-    if (convError || !convList?.length) {
+    if (convError) {
+      console.error('[useConversations]', convError.message, convError.details)
+      setConversations([])
+      setLoading(false)
+      return
+    }
+    if (!convList?.length) {
       setConversations([])
       setLoading(false)
       return

@@ -5,20 +5,20 @@ const navItems = [
   { to: '/', label: 'Home', Icon: HomeIcon },
   { to: '/collect', label: 'Collect', Icon: CollectIcon },
   { to: '/find', label: 'Find', Icon: FindIcon },
-  { to: '/chats', label: 'Messages', Icon: MessagesIcon },
   { to: '/ask', label: 'Ask', Icon: AskIcon },
+  { to: '/chats', label: 'Messages', Icon: MessagesIcon },
   { to: '/settings', label: 'Settings', Icon: SettingsIcon },
 ]
 
 export default function Layout({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#FAF8F6] pb-20">
+    <div className="min-h-screen bg-[#FAF8F6] pb-14">
       <main>{children ?? <Outlet />}</main>
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2 safe-area-pb">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 h-14 min-h-[56px] bg-[#F8F8F8] border-t border-gray-200 flex justify-around items-center py-2 safe-area-pb shadow-[0_-1px_6px_rgba(0,0,0,0.06)]">
         {navItems.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
-            to={to}
+            to={to} 
             className={({ isActive }) =>
               `flex flex-col items-center gap-1 text-[10px] font-medium uppercase ${isActive ? 'text-[#FF9C8F]' : 'text-gray-500'}`
             }

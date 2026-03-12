@@ -23,12 +23,20 @@ export function useProfile(user: User | null) {
       .maybeSingle()
 
     if (data) {
+      const photoFromDb = data.photo_url ?? data.avatar_url ?? data.picture ?? null
+      const photoFromAuth = user?.user_metadata?.picture ?? user?.user_metadata?.avatar_url ?? null
+      const photo_url = photoFromDb ?? photoFromAuth
+
+      if (!photoFromDb && photoFromAuth) {
+        await supabase.from('profiles').update({ photo_url: photoFromAuth }).eq('id', user!.id)
+      }
+
       setProfile({
         id: data.id,
         name: data.name ?? data.full_name ?? null,
         major: data.major ?? null,
         experience: data.experience ?? null,
-        photo_url: data.photo_url ?? data.avatar_url ?? data.picture ?? null,
+        photo_url,
       })
     } else if (error) {
       console.error('[useProfile]', error)

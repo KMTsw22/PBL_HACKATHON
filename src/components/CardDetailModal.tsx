@@ -21,10 +21,14 @@ type Props = {
   myRatings?: MyRatings | null
   onEditRatings?: () => void
   onMessage?: (card: UserCard) => void
+  /** 연락 초안이 있을 때 '연락 보내기'로 메시지 전송 후 이동 */
+  contactDraft?: string
+  /** 연락 없이 채팅방으로만 이동 (초안은 입력창에 채움) */
+  onNavigateToChat?: (card: UserCard) => void
   variant?: 'modal' | 'inline'
 }
 
-export default function CardDetailModal({ card, isOpen, onClose, onEdit, onDelete, onCollect, onCollectWithRating, isCollected, collectLabelWhenCollected, showShareIconOnly, myRatings, onEditRatings, onMessage, variant = 'modal' }: Props) {
+export default function CardDetailModal({ card, isOpen, onClose, onEdit, onDelete, onCollect, onCollectWithRating, isCollected, collectLabelWhenCollected, showShareIconOnly, myRatings, onEditRatings, onMessage, contactDraft, onNavigateToChat, variant = 'modal' }: Props) {
   const [showShare, setShowShare] = useState(false)
   if (!isOpen) return null
 
@@ -32,15 +36,13 @@ export default function CardDetailModal({ card, isOpen, onClose, onEdit, onDelet
   const isInline = variant === 'inline'
 
   const content = (
-    <div className={`relative w-full ${isInline ? '' : 'max-w-md'} bg-white rounded-t-2xl sm:rounded-2xl overflow-y-auto ${isInline ? 'rounded-2xl' : 'max-h-[90vh]'}`}>
+    <div className={`relative w-full ${isInline ? '' : 'max-w-md'} bg-white rounded-t-2xl sm:rounded-2xl overflow-y-auto ${isInline ? 'rounded-2xl pb-2' : 'max-h-[90vh] pb-6'}`}>
         <div className="relative">
           <div className="aspect-[4/3] w-full min-h-[220px] bg-[#FFE4E0] overflow-hidden rounded-t-2xl">
             <img src={card.image_url} alt="" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
             <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 z-10">
-              <span className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-[#FF9C8F] text-sm backdrop-blur-sm">
-                🌐
-              </span>
+              <span className="w-8" />
               <h2 className="text-lg font-bold text-white drop-shadow-lg">Networking Card</h2>
               {!isInline && onClose && (
                 <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-[#FF9C8F] hover:bg-white backdrop-blur-sm">
@@ -52,16 +54,13 @@ export default function CardDetailModal({ card, isOpen, onClose, onEdit, onDelet
           </div>
         </div>
 
-        <div className="relative -mt-6 mx-4 rounded-2xl bg-white shadow-lg p-6 pt-4 pb-6">
+        <div className="relative -mt-6 mx-4 mb-1 rounded-2xl bg-white shadow-lg p-6 pt-4 pb-4">
           <div className="text-center mb-4">
             <h3 className="text-xl font-bold text-gray-900">{card.card_name || 'My Card'}</h3>
             <p className="text-[#FF9C8F] text-sm mt-1">{card.custom_title || 'Professional'}</p>
-            <p className="text-gray-500 text-sm mt-1 flex items-center justify-center gap-1">
-              <span>📍</span> San Francisco, CA
-            </p>
           </div>
 
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-2.5 items-stretch p-1 rounded-2xl bg-gray-50/80 border border-gray-100">
             {onEdit && (
               <button
                 type="button"
@@ -69,7 +68,7 @@ export default function CardDetailModal({ card, isOpen, onClose, onEdit, onDelet
                   onClose?.()
                   onEdit(card)
                 }}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#FF9C8F] text-white font-medium rounded-xl"
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#FF9C8F] text-white font-medium rounded-xl shadow-sm hover:opacity-90 transition-opacity"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -90,15 +89,15 @@ export default function CardDetailModal({ card, isOpen, onClose, onEdit, onDelet
                     onCollect?.(card.id)
                   }
                 }}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 font-medium rounded-xl ${
+                className={`flex-1 flex items-center justify-center gap-2 py-3 font-medium rounded-xl transition-opacity ${
                   isCollected
-                    ? 'bg-[#FFE4E0] text-[#FF9C8F] border-2 border-[#FF9C8F]/50'
-                    : 'bg-[#FF9C8F] text-white'
+                    ? 'bg-white text-[#FF9C8F] border border-[#FF9C8F]/40 hover:bg-[#FFF5F3]'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:bg-[#FFE4E0] hover:border-[#FF9C8F]/40 hover:text-[#FF9C8F]'
                 }`}
               >
                 {isCollected ? (
                   <>
-                    <span>✓</span>
+                    <span className="text-[#FF9C8F]">✓</span>
                     {collectLabelWhenCollected ?? 'Collected'}
                   </>
                 ) : (
@@ -112,23 +111,34 @@ export default function CardDetailModal({ card, isOpen, onClose, onEdit, onDelet
               </button>
             )}
             {onMessage && (
-              <button
-                type="button"
-                onClick={() => { onClose?.(); onMessage(card) }}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#FF9C8F] text-white font-medium rounded-xl"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-                연락하기
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => { onClose?.(); onMessage(card) }}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#FF9C8F] text-white font-medium rounded-xl shadow-sm hover:opacity-90 transition-opacity"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  {contactDraft?.trim() ? '연락 보내기' : '연락하기'}
+                </button>
+                {contactDraft != null && onNavigateToChat && (
+                  <button
+                    type="button"
+                    onClick={() => { onClose?.(); onNavigateToChat(card) }}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    채팅으로 이동
+                  </button>
+                )}
+              </>
             )}
             <button
               type="button"
               onClick={() => setShowShare(true)}
               className={showShareIconOnly
-                ? 'w-11 h-11 flex items-center justify-center rounded-xl border-2 border-[#FF9C8F] text-[#FF9C8F] flex-shrink-0'
-                : 'flex-1 flex items-center justify-center gap-2 py-3 border-2 border-[#FF9C8F] text-[#FF9C8F] font-medium rounded-xl'}
+                ? 'w-11 h-11 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-[#FF9C8F] transition-colors flex-shrink-0'
+                : 'flex-1 flex items-center justify-center gap-2 py-3 bg-white border border-gray-200 text-gray-600 font-medium rounded-xl hover:bg-gray-50 hover:text-[#FF9C8F] transition-colors'}
               title="Share"
             >
               <svg width={showShareIconOnly ? 18 : 16} height={showShareIconOnly ? 18 : 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -145,7 +155,7 @@ export default function CardDetailModal({ card, isOpen, onClose, onEdit, onDelet
           {card.description && (
             <div className="mt-6">
               <h4 className="font-bold text-gray-900 mb-2">About</h4>
-              <p className="text-gray-600 text-sm leading-relaxed">{card.description}</p>
+              <p className="text-gray-600 text-sm leading-relaxed line-clamp-3">{card.description}</p>
             </div>
           )}
 
