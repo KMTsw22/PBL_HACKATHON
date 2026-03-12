@@ -9,9 +9,36 @@ export default function Settings() {
   const { profile } = useProfile(user)
   const [collecting, setCollecting] = useState(false)
   const [collectMessage, setCollectMessage] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!user) return
+    setDeleteError(null)
+    setDeleting(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-user', { body: {} })
+      if (error) {
+        setDeleteError(error.message || '계정 삭제에 실패했습니다.')
+        return
+      }
+      const result = data as { ok?: boolean; message?: string }
+      if (!result?.ok) {
+        setDeleteError(result?.message || '계정 삭제에 실패했습니다.')
+        return
+      }
+      setShowDeleteConfirm(false)
+      await supabase.auth.signOut()
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : '계정 삭제 중 오류가 났어요.')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const handleCollectAllSeedCards = async () => {
@@ -104,18 +131,18 @@ export default function Settings() {
             type="button"
             onClick={handleCollectAllSeedCards}
             disabled={collecting || !user}
-            className="w-full flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-100 hover:bg-gray-50 disabled:opacity-50"
+            className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-[#FF9C8F]/40 bg-[#FFE4E0]/60 hover:bg-[#FFE4E0] hover:border-[#FF9C8F]/60 disabled:opacity-50 transition-colors"
           >
-            <span className="text-gray-600">
+            <span className="w-10 h-10 rounded-full bg-[#FF9C8F]/20 flex items-center justify-center flex-shrink-0 text-[#FF9C8F]">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
               </svg>
             </span>
-            <div className="flex-1 text-left">
-              <p className="font-medium text-gray-900">전체 명함 한 번에 수집</p>
-              <p className="text-sm text-gray-500">수집 가능한 모든 데모 명함을 내 수집함에 추가 (Ask·추천 체험용)</p>
+            <div className="flex-1 text-left min-w-0">
+              <p className="font-semibold text-[#C75A4F]">전체 명함 한 번에 수집</p>
+              <p className="text-sm text-gray-600 mt-0.5">허수아비 카드들만 추가됨 (Ask·추천 체험용)</p>
             </div>
-            {collecting ? <span className="text-sm text-gray-500">처리 중...</span> : null}
+            {collecting ? <span className="text-sm font-medium text-[#FF9C8F] flex-shrink-0">처리 중...</span> : <span className="text-[#FF9C8F] flex-shrink-0" aria-hidden>→</span>}
           </button>
           {collectMessage && (
             <p className="text-sm px-4 py-2 rounded-lg bg-[#FFE4E0]/50 text-gray-700">{collectMessage}</p>
@@ -228,10 +255,46 @@ export default function Settings() {
           Logout
         </button>
         <br />
-        <button type="button" className="text-gray-500 text-sm hover:underline">
+        <button
+          type="button"
+          onClick={() => { setDeleteError(null); setShowDeleteConfirm(true) }}
+          className="text-gray-500 text-sm hover:underline hover:text-red-600"
+        >
           Delete Account
         </button>
       </div>
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">계정 삭제</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              계정과 모든 데이터가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다. 계속할까요?
+            </p>
+            {deleteError && (
+              <p className="text-sm text-red-600 mb-4">{deleteError}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? '처리 중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <p className="text-center text-xs text-gray-400">App Version 2.4.1 (Stable)</p>
     </div>

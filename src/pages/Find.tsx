@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useDiscoverCards } from '@/hooks/useDiscoverCards'
 import { useCollectedCardIds } from '@/hooks/useCollectedCardIds'
@@ -11,14 +11,36 @@ import type { RateCollectData } from '@/components/RateCollectModal'
 
 export default function Find() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
-  const { addCollect, collectedIds, loading: collectedIdsLoading } = useCollectedCardIds(user?.id ?? null)
-  const { cards, loading, fetchMore, hasMore, retry } = useDiscoverCards(user?.id ?? null, collectedIds, {
-    collectedReady: !collectedIdsLoading,
-  })
+  const { addCollect, collectedIds, refetch: refetchCollectedIds } = useCollectedCardIds(user?.id ?? null)
+  const { cards, loading, fetchMore, hasMore, retry } = useDiscoverCards(user?.id ?? null)
   const displayCards = cards.filter((card) => !collectedIds.has(card.id))
-  const waitForCollected = collectedIdsLoading
   const [rateCollectCard, setRateCollectCard] = useState<UserCard | null>(null)
+  const prevPathnameRef = useRef('')
+
+  // 디버깅: /find 상태
+  useEffect(() => {
+    if (location.pathname !== '/find') return
+    console.log('[Find] /find 페이지 상태', {
+      pathname: location.pathname,
+      userId: user?.id?.slice(0, 8) ?? null,
+      cards개수: cards.length,
+      collectedIds개수: collectedIds.size,
+      displayCards개수: displayCards.length,
+      loading,
+      hasMore,
+    })
+  }, [location.pathname, user?.id, cards.length, collectedIds.size, displayCards.length, loading, hasMore])
+
+  // Find 화면에 들어올 때 한 번만: 수집 목록 새로고침, 카드 있으면 Discover 새로고침 (Remove 반영).
+  useEffect(() => {
+    if (location.pathname !== '/find' || !user?.id) return
+    const justEnteredFind = prevPathnameRef.current !== '/find'
+    prevPathnameRef.current = location.pathname
+    refetchCollectedIds()
+    if (justEnteredFind && cards.length > 0) retry()
+  }, [location.pathname, user?.id, refetchCollectedIds, retry, cards.length])
 
   const handleCollectWithRating = useCallback((card: UserCard) => {
     setRateCollectCard(card)
@@ -41,6 +63,7 @@ export default function Find() {
     (entries: IntersectionObserverEntry[]) => {
       const [entry] = entries
       if (entry?.isIntersecting && hasMore && !loading) {
+        console.log('[Find] 스크롤 센티널 보임 → fetchMore')
         fetchMore()
       }
     },
@@ -60,24 +83,29 @@ export default function Find() {
   }, [handleIntersect, displayCards.length])
 
   useEffect(() => {
-    if (displayCards.length === 0 && hasMore && !loading) fetchMore()
+    if (displayCards.length === 0 && hasMore && !loading) {
+      console.log('[Find] displayCards 0개 → fetchMore 트리거')
+      fetchMore()
+    }
   }, [displayCards.length, hasMore, loading, fetchMore])
 
   useEffect(() => {
-    if (displayCards.length > 0 && displayCards.length <= 3 && hasMore && !loading) fetchMore()
+    if (displayCards.length > 0 && displayCards.length <= 3 && hasMore && !loading) {
+      console.log('[Find] displayCards 1~3개 → 추가 fetchMore 트리거')
+      fetchMore()
+    }
   }, [displayCards.length, hasMore, loading, fetchMore])
 
   return (
     <div className="min-h-full bg-[#FAF8F6] px-4 pt-4 pb-8">
-      <header className="flex items-center justify-between mb-4">
+      <header className="mb-4">
         <h1 className="text-lg font-bold text-gray-900">Find</h1>
-        <p className="text-sm text-gray-500">스크롤하여 더 보기</p>
       </header>
 
-      {waitForCollected || (displayCards.length === 0 && loading) ? (
+      {displayCards.length === 0 && loading ? (
         <div className="flex flex-col items-center justify-center py-20">
           <div className="w-10 h-10 border-2 border-[#FF9C8F] border-t-transparent rounded-full animate-spin" />
-          <p className="mt-4 text-sm text-gray-500">{waitForCollected ? '수집 목록 확인 중...' : '명함을 불러오는 중...'}</p>
+          <p className="mt-4 text-sm text-gray-500">명함을 불러오는 중...</p>
         </div>
       ) : displayCards.length === 0 && !hasMore ? (
         <div className="flex flex-col items-center justify-center py-20">

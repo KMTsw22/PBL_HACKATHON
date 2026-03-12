@@ -2,44 +2,54 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { UserCard } from './useUserCards'
 
-type Options = { collectedReady?: boolean }
-
-/** collectedIds: 이미 수집한 카드 id. DB에서부터 제외. collectedReady: true일 때만 첫 요청 (수집 목록 로딩 완료 후). */
-export function useDiscoverCards(userId: string | null, collectedIds: Set<string> = new Set(), options: Options = {}) {
-  const { collectedReady = true } = options
+/** DB에서 auth.uid()로 본인·수집 카드 제외 후 무작위 N장 반환. 인자는 p_limit만 넘김. */
+export function useDiscoverCards(userId: string | null) {
   const [cards, setCards] = useState<UserCard[]>([])
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const loadingRef = useRef(false)
   const cardsRef = useRef<UserCard[]>([])
   cardsRef.current = cards
-  const collectedIdsRef = useRef(collectedIds)
-  collectedIdsRef.current = collectedIds
 
   const fetchMore = useCallback(async () => {
-    if (!userId || loadingRef.current || !hasMore) return
+    if (!userId) {
+      console.debug('[Find] useDiscoverCards fetchMore 스킵: userId 없음')
+      return
+    }
+    if (loadingRef.current) {
+      console.debug('[Find] useDiscoverCards fetchMore 스킵: 이미 로딩 중')
+      return
+    }
+    if (!hasMore) {
+      console.debug('[Find] useDiscoverCards fetchMore 스킵: hasMore false')
+      return
+    }
     loadingRef.current = true
     setLoading(true)
+    const prev = cardsRef.current
+    const pageSize = prev.length === 0 ? 3 : 2
+    console.log('[Find] useDiscoverCards RPC 요청 시작', { userId: userId.slice(0, 8), pageSize, 기존카드수: prev.length })
     try {
-      const prev = cardsRef.current
-      const pageSize = prev.length === 0 ? 3 : 2
-      const alreadyShown = prev.map((c) => c.id)
-      const collected = Array.from(collectedIdsRef.current)
-      const excludeIds = [...new Set([...alreadyShown, ...collected])]
       const { data, error } = await supabase.rpc('get_random_discover_cards', {
         p_limit: pageSize,
-        p_exclude_ids: excludeIds,
+        p_exclude_ids: [],
       })
-      if (error) throw error
-      const fetched = (data as UserCard[]) ?? []
-      if (fetched.length > 0) {
-        setCards((p) => {
-          const existingIds = new Set(p.map((c) => c.id))
-          const newOnes = fetched.filter((c) => !existingIds.has(c.id))
-          return newOnes.length > 0 ? [...p, ...newOnes] : p
-        })
+      if (error) {
+        console.error('[Find] useDiscoverCards get_random_discover_cards error:', error.message, error.code)
+        throw error
       }
-      if (fetched.length < pageSize) setHasMore(false)
+      const fetched = Array.isArray(data) ? (data as UserCard[]) : []
+      console.log('[Find] useDiscoverCards RPC 응답', { 받은개수: fetched.length, ids: fetched.map((c) => c.id?.slice(0, 8)), rawType: Array.isArray(data) ? 'array' : typeof data })
+      const prev = cardsRef.current
+      const existingIds = new Set(prev.map((c) => c.id))
+      const newOnes = fetched.filter((c) => !existingIds.has(c.id))
+      if (newOnes.length > 0) {
+        setCards((p) => [...p, ...newOnes])
+      }
+      // 더 없음: 받은 개수 부족하거나, 받은 게 전부 기존과 중복일 때
+      if (fetched.length < pageSize || (fetched.length > 0 && newOnes.length === 0)) {
+        setHasMore(false)
+      }
     } catch {
       setHasMore(false)
     } finally {
@@ -49,8 +59,11 @@ export function useDiscoverCards(userId: string | null, collectedIds: Set<string
   }, [userId, hasMore])
 
   useEffect(() => {
-    if (userId && collectedReady && cards.length === 0 && hasMore) fetchMore()
-  }, [userId, collectedReady, cards.length, hasMore, fetchMore])
+    if (userId && cards.length === 0 && hasMore) {
+      console.log('[Find] useDiscoverCards 초기 fetch 트리거', { userId: userId.slice(0, 8) })
+      fetchMore()
+    }
+  }, [userId, cards.length, hasMore, fetchMore])
 
   const retry = useCallback(() => {
     setHasMore(true)

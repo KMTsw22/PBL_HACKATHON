@@ -118,7 +118,7 @@ export default function Home() {
           <p className="text-sm text-gray-500 mt-2">Your digital twin is active</p>
           <div className="mt-4 w-full max-w-sm">
             <p className="text-sm text-gray-700 bg-[#FFE4E0]/60 rounded-2xl px-4 py-3 border border-[#FF9C8F]/20">
-              {greeting}, {firstName}! You have 3 new potential matches today. ✨
+              ✨ {greeting}, {firstName}! ✨
             </p>
           </div>
         </div>
@@ -263,18 +263,6 @@ export default function Home() {
             </p>
             <p className="text-xs text-gray-500">이 카드 수집 수</p>
           </div>
-        </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#FFE4E0] flex items-center justify-center">
-              <span className="text-[#FF9C8F]">⭐</span>
-            </div>
-            <div>
-              <p className="font-medium text-gray-800">AI Match Rate</p>
-              <p className="text-sm text-gray-500">84% relevant leads</p>
-            </div>
-          </div>
-          <span className="text-lg font-bold text-[#FF9C8F]">High</span>
         </div>
       </section>
 

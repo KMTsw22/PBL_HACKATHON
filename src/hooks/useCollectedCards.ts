@@ -163,11 +163,15 @@ export function useCollectedCards(userId: string | null) {
   const removeCollect = useCallback(
     async (cardId: string) => {
       if (!userId || !supabase.from) return
-      await supabase
+      const { error } = await supabase
         .from('collected_cards')
         .delete()
         .eq('user_id', userId)
         .eq('card_id', cardId)
+      if (error) {
+        console.error('[removeCollect] DELETE failed:', error.message, error.code)
+        return
+      }
       setCollected((prev) => prev.filter((c) => c.card_id !== cardId))
     },
     [userId]

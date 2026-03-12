@@ -1,4 +1,4 @@
--- Find: DB에서 무작위로 N장 조회. 본인 카드·이미 수집한 카드는 DB에서 제외. p_exclude_ids는 이미 본 카드만(중복 방지).
+-- Find: RPC를 SECURITY DEFINER로 변경해 RLS 우회. 다른 사용자 카드는 함수 내부 WHERE로만 제한.
 CREATE OR REPLACE FUNCTION public.get_random_discover_cards(
   p_limit int,
   p_exclude_ids uuid[] DEFAULT '{}'
@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION public.get_random_discover_cards(
 RETURNS SETOF public.user_cards
 LANGUAGE sql
 STABLE
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT *
@@ -19,7 +19,7 @@ AS $$
   LIMIT p_limit;
 $$;
 
-COMMENT ON FUNCTION public.get_random_discover_cards(int, uuid[]) IS 'Find: 무작위 명함 N장 (본인·수집한 카드 제외는 DB 판단, p_exclude_ids는 이미 본 카드만)';
+COMMENT ON FUNCTION public.get_random_discover_cards(int, uuid[]) IS 'Find: 무작위 명함 N장 (SECURITY DEFINER로 RLS 우회, 본인·수집 제외는 WHERE로 적용)';
 
 GRANT EXECUTE ON FUNCTION public.get_random_discover_cards(int, uuid[]) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_random_discover_cards(int, uuid[]) TO service_role;
