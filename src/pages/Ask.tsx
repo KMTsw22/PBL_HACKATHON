@@ -12,6 +12,7 @@ import {
 } from '@/lib/askConversations'
 import type { RecommendResult } from '@/lib/recommendFromCollected'
 import CardDetailModal from '@/components/CardDetailModal'
+import { CardImage } from '@/components/CardImage'
 import { getOrCreateDmConversation, getOrCreateDmAndSendMessage } from '@/lib/chat'
 import type { UserCard } from '@/hooks/useUserCards'
 import { useAuth } from '@/hooks/useAuth'
@@ -796,7 +797,7 @@ export default function Ask() {
                         className="w-full flex items-center gap-3 p-3 bg-white hover:bg-[#FFE4E0]/30 rounded-xl text-left transition-colors border border-gray-100"
                       >
                         <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#FFE4E0] flex-shrink-0">
-                          <img src={r.card?.image_url} alt="" className="w-full h-full object-cover" />
+                          <CardImage imageUrl={r.card?.image_url ?? ''} name={r.card?.card_name} className="w-full h-full object-cover" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-900 text-sm truncate">{r.card?.card_name || 'My Card'}</p>

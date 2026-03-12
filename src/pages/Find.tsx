@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useDiscoverCards } from '@/hooks/useDiscoverCards'
-import { useCollectedCards } from '@/hooks/useCollectedCards'
+import { useCollectedCardIds } from '@/hooks/useCollectedCardIds'
 import CardDetailModal from '@/components/CardDetailModal'
 import RateCollectModal from '@/components/RateCollectModal'
 import { getOrCreateDmConversation } from '@/lib/chat'
@@ -13,7 +13,7 @@ export default function Find() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { cards, loading, fetchMore, hasMore, retry } = useDiscoverCards(user?.id ?? null)
-  const { addCollect, collectedIds } = useCollectedCards(user?.id ?? null)
+  const { addCollect, collectedIds } = useCollectedCardIds(user?.id ?? null)
   const displayCards = cards.filter((card) => !collectedIds.has(card.id))
   const [rateCollectCard, setRateCollectCard] = useState<UserCard | null>(null)
 
@@ -58,6 +58,10 @@ export default function Find() {
 
   useEffect(() => {
     if (displayCards.length === 0 && hasMore && !loading) fetchMore()
+  }, [displayCards.length, hasMore, loading, fetchMore])
+
+  useEffect(() => {
+    if (displayCards.length > 0 && displayCards.length <= 3 && hasMore && !loading) fetchMore()
   }, [displayCards.length, hasMore, loading, fetchMore])
 
   return (

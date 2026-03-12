@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { CardImage } from '@/components/CardImage'
 import { generateCardImage } from '@/lib/openai'
 import type { Profile } from '@/hooks/useProfile'
 import type { UserCard } from '@/hooks/useUserCards'
@@ -304,7 +305,7 @@ export default function AddCardModal({ isOpen, onClose, profile: _profile, userI
             <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-[#FF9C8F] hover:bg-[#FFE4E0]/20 transition-colors">
               {imageUrl ? (
                 <div className="relative w-full h-full rounded-xl overflow-hidden">
-                  <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                  <CardImage imageUrl={imageUrl} name={cardName} className="w-full h-full object-cover" />
                 </div>
               ) : (
                 <>

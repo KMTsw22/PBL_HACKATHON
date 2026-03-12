@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { UserCard } from '@/hooks/useUserCards'
 import ShareModal from './ShareModal'
+import { CardImage } from './CardImage'
 
 export type MyRatings = {
   scores: { category: string; score: number }[]
@@ -39,7 +40,7 @@ export default function CardDetailModal({ card, isOpen, onClose, onEdit, onDelet
     <div className={`relative w-full ${isInline ? '' : 'max-w-md'} bg-white rounded-t-2xl sm:rounded-2xl overflow-y-auto ${isInline ? 'rounded-2xl pb-2' : 'max-h-[90vh] pb-6'}`}>
         <div className="relative">
           <div className="aspect-[4/3] w-full min-h-[220px] bg-[#FFE4E0] overflow-hidden rounded-t-2xl">
-            <img src={card.image_url} alt="" className="w-full h-full object-cover" />
+            <CardImage imageUrl={card.image_url} name={card.card_name} className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
             <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-3 z-10">
               <span className="w-8" />

@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { useCollectedCards, type CollectedCard } from '@/hooks/useCollectedCards'
 import CardDetailModal from '@/components/CardDetailModal'
+import { CardImage } from '@/components/CardImage'
 import RateCollectModal from '@/components/RateCollectModal'
 import { getOrCreateDmConversation } from '@/lib/chat'
 
 export default function Collect() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { collected, loading, removeCollect, updateRatings } = useCollectedCards(user?.id ?? null)
+  const { collected, loading, loadingMore, hasMore, fetchMore, removeCollect, updateRatings } = useCollectedCards(user?.id ?? null)
   const [search, setSearch] = useState('')
   const [selectedItem, setSelectedItem] = useState<CollectedCard | null>(null)
   const [showEditRatings, setShowEditRatings] = useState(false)
@@ -21,6 +22,32 @@ export default function Collect() {
     const q = search.toLowerCase().trim()
     return !q || name.includes(q) || title.includes(q)
   })
+
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const handleIntersect = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      const [entry] = entries
+      if (entry?.isIntersecting && hasMore && !loading && !loadingMore) {
+        fetchMore()
+      }
+    },
+    [fetchMore, hasMore, loading, loadingMore]
+  )
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(handleIntersect, {
+      root: null,
+      rootMargin: '100px',
+      threshold: 0.1,
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [handleIntersect, filtered.length])
+
+  useEffect(() => {
+    if (filtered.length > 0 && filtered.length <= 5 && hasMore && !loading && !loadingMore) fetchMore()
+  }, [filtered.length, hasMore, loading, loadingMore, fetchMore])
 
   return (
     <div className="min-h-full bg-[#FAF8F6] px-4 pt-4 pb-24">
@@ -78,7 +105,7 @@ export default function Collect() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 pb-8">
           {filtered.map((item) => {
             const card = item.user_cards
             if (!card) return null
@@ -90,7 +117,7 @@ export default function Collect() {
                 className="w-full flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow text-left"
               >
                 <div className="w-14 h-14 rounded-xl overflow-hidden bg-[#FFE4E0] flex-shrink-0">
-                  <img src={card.image_url} alt="" className="w-full h-full object-cover" />
+                  <CardImage imageUrl={card.image_url} name={card.card_name} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-900 truncate">{card.card_name || 'My Card'}</p>
@@ -102,6 +129,11 @@ export default function Collect() {
               </button>
             )
           })}
+          <div ref={sentinelRef} className="h-4 flex items-center justify-center py-4">
+            {loadingMore && (
+              <div className="w-8 h-8 border-2 border-[#FF9C8F] border-t-transparent rounded-full animate-spin" />
+            )}
+          </div>
         </div>
       )}
 

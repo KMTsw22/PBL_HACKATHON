@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { UserCard } from '@/hooks/useUserCards'
 import { analyzeCardForRating } from '@/lib/analyzeCardRating'
+import { CardImage } from './CardImage'
 
 const FALLBACK_CATEGORIES = ['Expertise', 'Professionalism', 'Communication'] as const
 
@@ -180,8 +181,8 @@ export default function RateCollectModal({ isOpen, onClose, card, initialData, o
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={handleClose} aria-hidden />
-      <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-xl">
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+      <div className="relative w-full max-w-md max-h-[90vh] flex flex-col bg-white rounded-t-2xl sm:rounded-2xl shadow-xl">
+        <div className="flex-shrink-0 border-b border-gray-100 px-4 py-3 flex items-center justify-between">
           <h2 className="text-lg font-bold text-gray-900">Rate & Collect</h2>
           <button
             type="button"
@@ -192,11 +193,11 @@ export default function RateCollectModal({ isOpen, onClose, card, initialData, o
           </button>
         </div>
 
-        <div className="p-4 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
           {/* Card preview */}
           <div className="flex gap-3 p-3 bg-[#FFE4E0]/50 rounded-xl">
             <div className="w-14 h-14 rounded-lg overflow-hidden bg-[#FFE4E0] flex-shrink-0">
-              <img src={card.image_url} alt="" className="w-full h-full object-cover" />
+              <CardImage imageUrl={card.image_url} name={card.card_name} className="w-full h-full object-cover" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-gray-900 truncate">{card.card_name || 'My Card'}</p>

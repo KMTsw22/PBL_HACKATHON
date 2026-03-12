@@ -1,5 +1,6 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { CardImage } from '@/components/CardImage'
 import { useAuth } from '@/hooks/useAuth'
 import { useMessages } from '@/hooks/useMessages'
 import { useState } from 'react'
@@ -12,15 +13,40 @@ export default function ChatThread() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
-  const { messages, loading, sendMessage } = useMessages(conversationId ?? null, user?.id ?? null)
+  const { messages, loading, loadingOlder, hasMoreOlder, loadMoreOlder, sendMessage } = useMessages(conversationId ?? null, user?.id ?? null)
   const draftFromState = (location.state as { draft?: string } | null)?.draft
   const [input, setInput] = useState(() => draftFromState ?? '')
   const [otherUser, setOtherUser] = useState<OtherUser | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const prevScrollRef = useRef<{ height: number; top: number } | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  const handleLoadMoreOlder = useCallback(() => {
+    if (!hasMoreOlder || loadingOlder) return
+    const el = scrollContainerRef.current
+    if (el) prevScrollRef.current = { height: el.scrollHeight, top: el.scrollTop }
+    loadMoreOlder()
+  }, [hasMoreOlder, loadingOlder, loadMoreOlder])
+
+  useEffect(() => {
+    if (prevScrollRef.current && scrollContainerRef.current && !loadingOlder) {
+      const prev = prevScrollRef.current
+      prevScrollRef.current = null
+      const el = scrollContainerRef.current
+      const newHeight = el.scrollHeight
+      el.scrollTop = Math.max(0, newHeight - prev.height + prev.top)
+    }
+  }, [messages.length, loadingOlder])
+
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current
+    if (!el || !hasMoreOlder || loadingOlder) return
+    if (el.scrollTop < 250) handleLoadMoreOlder()
+  }, [hasMoreOlder, loadingOlder, handleLoadMoreOlder])
 
   useEffect(() => {
     if (!conversationId || !user?.id) return
@@ -74,13 +100,11 @@ export default function ChatThread() {
           </svg>
         </button>
         <div className="w-10 h-10 rounded-full overflow-hidden bg-[#FFE4E0] flex-shrink-0 relative">
-          {otherUser?.photo_url ? (
-            <img src={otherUser.photo_url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-[#FF9C8F] font-bold">
-              {(otherUser?.name || '?').charAt(0)}
-            </div>
-          )}
+          <CardImage
+            imageUrl={otherUser?.photo_url ?? ''}
+            name={otherUser?.name}
+            className="w-full h-full object-cover rounded-full"
+          />
           <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white" />
         </div>
         <div className="flex-1 min-w-0">
@@ -102,34 +126,49 @@ export default function ChatThread() {
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-24 space-y-3">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-4 py-4 pb-24 space-y-3"
+      >
         {loading ? (
           <div className="flex justify-center py-8">
             <div className="w-8 h-8 border-2 border-[#FF9C8F] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <>
+            {hasMoreOlder && (
+              <div className="flex justify-center py-2">
+                {loadingOlder ? (
+                  <div className="w-6 h-6 border-2 border-[#FF9C8F] border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleLoadMoreOlder}
+                    className="text-xs text-gray-500 hover:text-[#FF9C8F]"
+                  >
+                    이전 메시지 더 보기
+                  </button>
+                )}
+              </div>
+            )}
             {messages.map((msg) => {
               const isMe = msg.sender_id === user?.id
               return (
                 <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
                   <div className="w-8 h-8 rounded-full overflow-hidden bg-[#FFE4E0] flex-shrink-0 mt-1">
                     {isMe ? (
-                      (user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture) ? (
-                        <img src={(user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture) as string} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[#FF9C8F] text-xs font-bold">
-                          {(user?.user_metadata?.full_name || 'U').charAt(0)}
-                        </div>
-                      )
+                      <CardImage
+                        imageUrl={(user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture) as string ?? ''}
+                        name={(user?.user_metadata?.full_name as string) ?? 'U'}
+                        className="w-full h-full object-cover rounded-full"
+                      />
                     ) : (
-                      otherUser?.photo_url ? (
-                        <img src={otherUser.photo_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[#FF9C8F] text-xs font-bold">
-                          {(otherUser?.name || '?').charAt(0)}
-                        </div>
-                      )
+                      <CardImage
+                        imageUrl={otherUser?.photo_url ?? ''}
+                        name={otherUser?.name}
+                        className="w-full h-full object-cover rounded-full"
+                      />
                     )}
                   </div>
                   <div className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'} flex flex-col`}>

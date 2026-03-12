@@ -6,6 +6,7 @@ import { useUserCards, type UserCard } from '@/hooks/useUserCards'
 import { useCardStats } from '@/hooks/useCardStats'
 import AddCardModal, { type AddCardData } from '@/components/AddCardModal'
 import CardDetailModal from '@/components/CardDetailModal'
+import { CardImage } from '@/components/CardImage'
 
 export default function Home() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -107,13 +108,11 @@ export default function Home() {
               </button>
             </div>
             <div className="w-12 h-12 rounded-full bg-[#FFE4E0] border-2 border-[#FF9C8F]/30 flex items-center justify-center overflow-hidden shadow-sm flex-shrink-0">
-              {profile?.photo_url ? (
-                <img src={profile.photo_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-xl font-bold text-[#FF9C8F]">
-                  {(profile?.name || user?.user_metadata?.full_name || user?.user_metadata?.name || '?').charAt(0).toUpperCase()}
-                </span>
-              )}
+              <CardImage
+                imageUrl={profile?.photo_url ?? ''}
+                name={profile?.name || (user?.user_metadata?.full_name as string) || (user?.user_metadata?.name as string)}
+                className="w-full h-full object-cover rounded-full"
+              />
             </div>
           </div>
           <p className="text-sm text-gray-500 mt-2">Your digital twin is active</p>
@@ -144,9 +143,9 @@ export default function Home() {
                 onClick={() => !isAnimating && setDetailCard(card)}
               >
                 <div className="relative w-full h-full rounded-2xl shadow-lg overflow-hidden">
-                  <img
-                    src={card.image_url}
-                    alt={card.card_name || 'AI Card'}
+                  <CardImage
+                    imageUrl={card.image_url}
+                    name={card.card_name}
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
@@ -191,9 +190,9 @@ export default function Home() {
                   className="absolute inset-0 focus:outline-none focus:ring-2 focus:ring-[#FF9C8F] focus:ring-offset-2 rounded-r-2xl"
                 >
                   <div className="absolute right-0 top-0 h-full aspect-[3/4] overflow-hidden rounded-2xl shadow-md border border-white border-l-0 opacity-60">
-                    <img
-                      src={cards[nextIndex]!.image_url}
-                      alt={cards[nextIndex]!.card_name || 'AI Card'}
+                    <CardImage
+                      imageUrl={cards[nextIndex]!.image_url}
+                      name={cards[nextIndex]!.card_name}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-white/20" />

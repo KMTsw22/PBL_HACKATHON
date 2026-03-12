@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { UserCard } from './useUserCards'
+
+const PAGE_SIZE = 15
 
 export type CollectedScore = {
   category: string
@@ -20,73 +22,114 @@ export type CollectedCard = {
 export function useCollectedCards(userId: string | null) {
   const [collected, setCollected] = useState<CollectedCard[]>([])
   const [loading, setLoading] = useState(true)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const offsetRef = useRef(0)
+  const loadingRef = useRef(false)
 
-  const fetchCollected = useCallback(async () => {
-    if (!userId || !supabase.from) {
-      setCollected([])
+  const fetchPage = useCallback(
+    async (append: boolean) => {
+      if (!userId || !supabase.from || loadingRef.current) return
+      loadingRef.current = true
+      if (!append) {
+        setLoading(true)
+        offsetRef.current = 0
+      } else {
+        setLoadingMore(true)
+      }
+      const from = append ? offsetRef.current : 0
+      const to = from + PAGE_SIZE - 1
+      const { data: rows, error } = await supabase
+        .from('collected_cards')
+        .select('id, card_id, created_at, private_notes')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .range(from, to)
+
+      if (error) {
+        console.error('collected_cards fetch error:', error)
+        if (!append) setCollected([])
+        setHasMore(false)
+        setLoading(false)
+        setLoadingMore(false)
+        loadingRef.current = false
+        return
+      }
+
+      const list = rows ?? []
+      if (list.length < PAGE_SIZE) setHasMore(false)
+      if (list.length === 0) {
+        if (!append) setCollected([])
+        setLoading(false)
+        setLoadingMore(false)
+        loadingRef.current = false
+        return
+      }
+
+      const collectedIds = list.map((r) => r.id)
+      const cardIds = list.map((r) => r.card_id).filter(Boolean)
+
+      const [cardsRes, scoresRes] = await Promise.all([
+        cardIds.length > 0 ? supabase.from('user_cards').select('*').in('id', cardIds) : { data: [] },
+        collectedIds.length > 0
+          ? supabase.from('collected_card_scores').select('collected_card_id, category, score, is_ai_suggested').in('collected_card_id', collectedIds)
+          : { data: [] },
+      ])
+
+      const cards = (cardsRes.data ?? []) as UserCard[]
+      const scoresRows = (scoresRes.data ?? []) as { collected_card_id: string; category: string; score: number; is_ai_suggested: boolean }[]
+      const cardMap = new Map(cards.map((c) => [c.id, c as UserCard]))
+      const scoresByCollected = new Map<string, CollectedScore[]>()
+      for (const s of scoresRows) {
+        const arr = scoresByCollected.get(s.collected_card_id) ?? []
+        arr.push({
+          category: s.category,
+          score: Number(s.score),
+          is_ai_suggested: s.is_ai_suggested ?? false,
+        })
+        scoresByCollected.set(s.collected_card_id, arr)
+      }
+
+      const result: CollectedCard[] = list.map((r) => ({
+        id: r.id,
+        card_id: r.card_id,
+        created_at: r.created_at,
+        private_notes: r.private_notes ?? null,
+        user_cards: cardMap.get(r.card_id) ?? null,
+        scores: scoresByCollected.get(r.id) ?? [],
+      }))
+
+      if (append) {
+        setCollected((prev) => {
+          const existingIds = new Set(prev.map((c) => c.id))
+          const newOnes = result.filter((c) => !existingIds.has(c.id))
+          return newOnes.length > 0 ? [...prev, ...newOnes] : prev
+        })
+      } else {
+        setCollected(result)
+      }
+      offsetRef.current = to + 1
       setLoading(false)
-      return
-    }
-    const { data: rows, error } = await supabase
-      .from('collected_cards')
-      .select('id, card_id, created_at, private_notes')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('collected_cards fetch error:', error)
-      setCollected([])
-      setLoading(false)
-      return
-    }
-
-    const collectedIds = (rows ?? []).map((r) => r.id)
-    const cardIds = (rows ?? []).map((r) => r.card_id).filter(Boolean)
-
-    const [cardsRes, scoresRes] = await Promise.all([
-      cardIds.length > 0
-        ? supabase.from('user_cards').select('*').in('id', cardIds)
-        : Promise.resolve({ data: [] }),
-      collectedIds.length > 0
-        ? supabase.from('collected_card_scores').select('collected_card_id, category, score, is_ai_suggested').in('collected_card_id', collectedIds)
-        : Promise.resolve({ data: [] }),
-    ])
-
-    const cards = cardsRes.data ?? []
-    const scoresRows = scoresRes.data ?? []
-    const cardMap = new Map(cards.map((c) => [c.id, c as UserCard]))
-    const scoresByCollected = new Map<string, CollectedScore[]>()
-    for (const s of scoresRows) {
-      const list = scoresByCollected.get(s.collected_card_id) ?? []
-      list.push({
-        category: s.category,
-        score: Number(s.score),
-        is_ai_suggested: s.is_ai_suggested ?? false,
-      })
-      scoresByCollected.set(s.collected_card_id, list)
-    }
-
-    const result: CollectedCard[] = (rows ?? []).map((r) => ({
-      id: r.id,
-      card_id: r.card_id,
-      created_at: r.created_at,
-      private_notes: r.private_notes ?? null,
-      user_cards: cardMap.get(r.card_id) ?? null,
-      scores: scoresByCollected.get(r.id) ?? [],
-    }))
-    setCollected(result)
-    setLoading(false)
-  }, [userId])
+      setLoadingMore(false)
+      loadingRef.current = false
+    },
+    [userId]
+  )
 
   useEffect(() => {
     if (!userId) {
       setCollected([])
       setLoading(false)
+      setHasMore(true)
+      offsetRef.current = 0
       return
     }
-    setLoading(true)
-    fetchCollected()
-  }, [userId, fetchCollected])
+    fetchPage(false)
+  }, [userId, fetchPage])
+
+  const fetchMore = useCallback(() => {
+    if (hasMore && !loadingRef.current) fetchPage(true)
+  }, [hasMore, fetchPage])
 
   const addCollect = useCallback(
     async (cardId: string, options?: { privateNotes?: string; scores?: { category: string; score: number; isAiSuggested?: boolean }[] }) => {
@@ -112,9 +155,9 @@ export function useCollectedCards(userId: string | null) {
         }))
         await supabase.from('collected_card_scores').insert(scoreRows)
       }
-      fetchCollected()
+      fetchPage(false)
     },
-    [userId, fetchCollected]
+    [userId, fetchPage]
   )
 
   const removeCollect = useCallback(
@@ -125,9 +168,9 @@ export function useCollectedCards(userId: string | null) {
         .delete()
         .eq('user_id', userId)
         .eq('card_id', cardId)
-      fetchCollected()
+      setCollected((prev) => prev.filter((c) => c.card_id !== cardId))
     },
-    [userId, fetchCollected]
+    [userId]
   )
 
   const updateRatings = useCallback(
@@ -155,9 +198,19 @@ export function useCollectedCards(userId: string | null) {
         }))
         await supabase.from('collected_card_scores').insert(scoreRows)
       }
-      fetchCollected()
+      setCollected((prev) =>
+        prev.map((c) =>
+          c.id !== collectedCardId
+            ? c
+            : {
+                ...c,
+                private_notes: data.privateNotes ?? c.private_notes,
+                scores: data.scores.map((s) => ({ category: s.category, score: s.score, is_ai_suggested: s.isAiSuggested ?? false })),
+              }
+        )
+      )
     },
-    [userId, fetchCollected]
+    [userId]
   )
 
   const isCollected = useCallback(
@@ -170,11 +223,14 @@ export function useCollectedCards(userId: string | null) {
   return {
     collected,
     loading,
+    loadingMore,
+    hasMore,
+    fetchMore,
     addCollect,
     removeCollect,
     updateRatings,
     isCollected,
     collectedIds,
-    refetch: fetchCollected,
+    refetch: () => fetchPage(false),
   }
 }

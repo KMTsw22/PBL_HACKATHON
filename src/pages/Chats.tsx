@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { CardImage } from '@/components/CardImage'
 import { useConversations } from '@/hooks/useConversations'
 import { useCollectedCards } from '@/hooks/useCollectedCards'
 import { getOrCreateDmConversation } from '@/lib/chat'
@@ -95,7 +96,7 @@ export default function Chats() {
                       className="flex-shrink-0 flex flex-col items-center gap-2"
                     >
                       <div className="relative w-14 h-14 rounded-full overflow-hidden bg-[#FFE4E0] border-2 border-white shadow-sm">
-                        <img src={card.image_url} alt="" className="w-full h-full object-cover" />
+                        <CardImage imageUrl={card.image_url} name={card.card_name} className="w-full h-full object-cover" />
                         <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white" aria-hidden />
                       </div>
                       <span className="text-xs font-medium text-gray-800 max-w-[72px] truncate">
@@ -128,13 +129,11 @@ export default function Chats() {
                     className="w-full flex items-center gap-3 py-3 px-2 rounded-xl hover:bg-[#FFE4E0]/30 transition-colors text-left"
                   >
                     <div className="w-12 h-12 rounded-full overflow-hidden bg-[#FFE4E0] flex-shrink-0">
-                      {conv.other_user.photo_url ? (
-                        <img src={conv.other_user.photo_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[#FF9C8F] font-bold text-lg">
-                          {(conv.other_user.name || '?').charAt(0)}
-                        </div>
-                      )}
+                      <CardImage
+                        imageUrl={conv.other_user.photo_url ?? ''}
+                        name={conv.other_user.name}
+                        className="w-full h-full object-cover rounded-full"
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 truncate">{conv.other_user.name || 'Unknown'}</p>

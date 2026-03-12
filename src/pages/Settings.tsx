@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CardImage } from '@/components/CardImage'
 import { useAuth } from '@/hooks/useAuth'
 import { useProfile } from '@/hooks/useProfile'
 import { supabase } from '@/lib/supabase'
@@ -76,13 +77,11 @@ export default function Settings() {
 
       <div className="flex items-center gap-4 p-4 bg-white rounded-xl border border-[#FFE4E0] mb-6">
         <div className="w-14 h-14 rounded-full bg-[#FFE4E0] flex items-center justify-center overflow-hidden">
-          {profile?.photo_url ? (
-            <img src={profile.photo_url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-2xl font-bold text-[#FF9C8F]">
-              {(displayName || '?').charAt(0).toUpperCase()}
-            </span>
-          )}
+          <CardImage
+            imageUrl={profile?.photo_url ?? ''}
+            name={displayName}
+            className="w-full h-full object-cover rounded-full"
+          />
         </div>
         <div className="flex-1">
           <p className="font-bold text-gray-900">{displayName}</p>

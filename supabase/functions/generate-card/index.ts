@@ -20,10 +20,19 @@ serve(async (req) => {
       )
     }
 
-    const { prompt, imageBase64 } = await req.json()
-    if (!prompt || typeof prompt !== 'string') {
+    const body = await req.json()
+    const prompt =
+      typeof body.prompt === 'string'
+        ? body.prompt
+        : typeof body.description === 'string'
+          ? [body.cardName, body.description, body.customTitle, body.customContent]
+              .filter(Boolean)
+              .join('. ')
+          : null
+    const imageBase64 = body.imageBase64
+    if (!prompt) {
       return new Response(
-        JSON.stringify({ message: 'prompt is required and must be a string' }),
+        JSON.stringify({ message: 'prompt or description is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -152,6 +161,7 @@ serve(async (req) => {
     const ext = 'png'
     const path = `cards/${crypto.randomUUID()}.${ext}`
 
+    // DB에 오래 보관: OpenAI 임시 URL 대신 Supabase Storage에 업로드 후 public URL 반환 → 클라이언트가 user_cards.image_url에 저장
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(path, imageBlob, { contentType: 'image/png', upsert: true })
