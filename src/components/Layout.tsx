@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import { useNavVisibility } from '@/contexts/NavVisibilityContext'
 import { HomeIcon, CollectIcon, FindIcon, MessagesIcon, AskIcon, SettingsIcon } from './NavIcons'
 
@@ -12,10 +12,8 @@ const navItems = [
 ]
 
 export default function Layout({ children }: { children?: React.ReactNode }) {
-  const location = useLocation()
   const { hideNav } = useNavVisibility()
-  const isAskPage = location.pathname === '/ask'
-  const showNav = !hideNav && !isAskPage
+  const showNav = !hideNav
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF8F6]">
