@@ -216,9 +216,6 @@ export default function Home() {
                 <span className="text-2xl">📱</span>
               </div>
             </div>
-            <div className="flex justify-end">
-              <span className="text-white/80 text-sm">QR</span>
-            </div>
           </div>
         )}
         <div className="mt-4 flex flex-col gap-2">

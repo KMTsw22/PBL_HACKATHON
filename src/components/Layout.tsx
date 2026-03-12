@@ -12,8 +12,10 @@ const navItems = [
 
 export default function Layout({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#FAF8F6] pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))]">
-      <main>{children ?? <Outlet />}</main>
+    <div className="min-h-screen flex flex-col bg-[#FAF8F6]">
+      <main className="flex-1 min-h-0 overflow-y-auto pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))]">
+        {children ?? <Outlet />}
+      </main>
       <nav className="fixed bottom-0 left-0 right-0 z-50 h-14 min-h-[56px] bg-[#F8F8F8] border-t border-gray-200 flex justify-around items-center py-2 safe-area-pb shadow-[0_-1px_6px_rgba(0,0,0,0.06)]">
         {navItems.map(({ to, label, Icon }) => (
           <NavLink
