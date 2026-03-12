@@ -205,7 +205,7 @@ export function useCollectedCards(userId: string | null) {
             : {
                 ...c,
                 private_notes: data.privateNotes ?? c.private_notes,
-                scores: data.scores.map((s) => ({ category: s.category, score: s.score, is_ai_suggested: s.isAiSuggested ?? false })),
+                scores: (data.scores ?? []).map((s) => ({ category: s.category, score: s.score, is_ai_suggested: s.isAiSuggested ?? false })),
               }
         )
       )
