@@ -535,7 +535,7 @@ export default function Ask() {
   }
 
   return (
-    <div className="min-h-full bg-gray-50 flex flex-col relative">
+    <div className="min-h-full bg-gray-50 flex flex-col relative pt-14">
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/30" onClick={() => setSidebarOpen(false)} aria-hidden />
@@ -578,7 +578,7 @@ export default function Ask() {
           </div>
         </div>
       )}
-      <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100">
+      <header className="fixed top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-3 bg-white border-b border-gray-100">
         <button type="button" onClick={() => setSidebarOpen(true)} className="w-10 h-10 flex items-center justify-center text-gray-700">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="3" y1="12" x2="21" y2="12" />

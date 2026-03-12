@@ -87,8 +87,8 @@ export default function ChatThread() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[#FAF8F6]">
-      <header className="flex-shrink-0 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 shadow-sm">
+    <div className="h-screen flex flex-col bg-[#FAF8F6] pt-14">
+      <header className="fixed top-0 left-0 right-0 z-20 flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 shadow-sm">
         <button
           type="button"
           onClick={() => navigate(-1)}
