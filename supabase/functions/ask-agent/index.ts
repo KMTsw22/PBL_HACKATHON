@@ -478,7 +478,7 @@ Suggest 1-3 people.`
     (recs.length > 0 ? `연락 추천: ${recs.length}명 (${names}).\n` : '조건에 맞는 연락처를 찾지 못했어요.\n') +
     (outreachTip ? `\n[연락 팁]\n${outreachTip}` : '')
   if (streamOpts) streamOpts.writeStream({ type: 'step_part', from: streamOpts.agentLabel, part: 'GPT-4o-mini', content: primarySummary })
-  const secondResRaw = await callOpenAISecondModel(openaiKey, contactRecommendSystem, contactRecommendUser, 550)
+  const secondResRaw = await callOpenAISecondModel(openaiKey, contactRecommendSystem, contactRecommendUser, 1100)
   const secondResDisplay = formatContactSecondPartForDisplay(secondResRaw, recs.length, names)
   if (streamOpts && secondResDisplay) streamOpts.writeStream({ type: 'step_part', from: streamOpts.agentLabel, part: 'GPT-3.5', content: secondResDisplay })
   let summary = primarySummary
@@ -591,7 +591,7 @@ async function callLlm(openaiKey: string, systemPrompt: string, userContent: str
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userContent },
       ],
-      max_tokens: 1000,
+      max_tokens: 10000,
       temperature: 0.5,
     }),
   })
@@ -728,27 +728,38 @@ async function getCollectedCardsWithSummaries(
     console.error('[ask-agent] getCollectedCardsWithSummaries collected_cards error:', collectedError.message, collectedError.details)
     return { cards: [], cardSummaries: [] }
   }
-  if (!collectedRows?.length) return { cards: [], cardSummaries: [] }
+  if (!collectedRows?.length) {
+    console.log('[ask-agent] getCollectedCardsWithSummaries: no collected_cards for user', userId.slice(0, 8))
+    return { cards: [], cardSummaries: [] }
+  }
 
   const cardIdList = collectedRows.map((r) => r.card_id).filter(Boolean) as string[]
   const cardToCollectedId = new Map(collectedRows.map((r) => [r.card_id, r.id]))
   const collectedIds = collectedRows.map((r) => r.id)
 
-  const [cardsRes, scoresRes] = await Promise.all([
-    supabase.from('user_cards').select('*').in('id', cardIdList),
-    supabase.from('collected_card_scores').select('collected_card_id, category, score').in('collected_card_id', collectedIds),
-  ])
-  if (cardsRes.error) {
-    console.error('[ask-agent] getCollectedCardsWithSummaries user_cards error:', cardsRes.error.message, cardsRes.error.details)
-    return { cards: [], cardSummaries: [] }
+  let cards: Record<string, unknown>[] = []
+  const chunkSize = 80
+  for (let i = 0; i < cardIdList.length; i += chunkSize) {
+    const chunk = cardIdList.slice(i, i + chunkSize)
+    const res = await supabase.from('user_cards').select('*').in('id', chunk)
+    if (res.error) {
+      console.error('[ask-agent] getCollectedCardsWithSummaries user_cards error:', res.error.message, res.error.details)
+      return { cards: [], cardSummaries: [] }
+    }
+    cards = cards.concat((res.data ?? []) as Record<string, unknown>[])
   }
+
+  const scoresRes = await supabase
+    .from('collected_card_scores')
+    .select('collected_card_id, category, score')
+    .in('collected_card_id', collectedIds)
   if (scoresRes.error) {
     console.error('[ask-agent] getCollectedCardsWithSummaries collected_card_scores error:', scoresRes.error.message)
-    // scores 실패만 있으면 카드는 그대로 쓰고 점수만 빈 값으로 진행
   }
-  const cards = (cardsRes.data ?? []) as Record<string, unknown>[]
   if (cardIdList.length > 0 && cards.length === 0) {
-    console.warn('[ask-agent] getCollectedCardsWithSummaries: collected_cards has', cardIdList.length, 'card_ids but user_cards returned 0 rows. Check user_cards RLS or deleted cards.')
+    console.warn('[ask-agent] getCollectedCardsWithSummaries: collected_cards has', cardIdList.length, 'card_ids but user_cards returned 0 rows. card_id sample:', cardIdList[0])
+  } else {
+    console.log('[ask-agent] getCollectedCardsWithSummaries: user', userId.slice(0, 8), 'collected=', collectedRows.length, 'user_cards=', cards.length)
   }
   const scoresRows = (scoresRes.data ?? []) as { collected_card_id: string; category: string; score: number }[]
   const scoresByCollected = new Map<string, { category: string; score: number }[]>()
@@ -766,7 +777,7 @@ async function getCollectedCardsWithSummaries(
       name: String(c.card_name || 'Unknown'),
       title: String(c.custom_title || ''),
       expertise: String(c.custom_content || ''),
-      description: String(c.description || '').slice(0, 200),
+      description: String(c.description || '').slice(0, 500),
       scores: scores.map((s) => `${s.category}:${s.score}`).join(', '),
     }
     if (options?.includeContact) {
@@ -847,21 +858,48 @@ async function runAnalyzeRequest(
   return { toolResult, primaryText: openaiRes, secondText: secondRes }
 }
 
-const CONTEXT_MATCHER_SYSTEM = `You select and rank people from the user's collected cards that best match the criteria. **선정 이유는 반드시 구체적으로** 쓸 것.
+const CONTEXT_MATCHER_SYSTEM = `You select people from the user's collected cards who are **포괄적으로 관련 있는** 인원을 선정합니다. **수집 명함이 1장이라도 있으면, 조건과 조금이라도 연관되면 반드시 1명 이상 선정**하세요. ids를 빈 배열 []로 반환하는 것은 **금지**입니다(전혀 무관한 명함만 있을 때만 예외). **선정 이유는 반드시 구체적으로** 쓸 것.
 
 context_type: "business" = 기술 적합성, 협업 경험, 프로젝트 매칭. "casual" = 지역, 취미, 만남 가능성.
 
-**부분 매칭 허용:** 애초에 완전히 맞는 사람은 없습니다. 완벽히 맞는 사람이 없어도, **조건과 관련이 있는**(직무·기술·역할·취미·지역이 겹치는) 명함이 있으면 **1~2명이라도 선정**하세요. reasons에 "완벽한 매칭은 아니지만 OO 측면에서 관련이 있어 선정했습니다"처럼 부분 매칭임을 구체적으로 적어주세요. 아예 무관한 사람만 있을 때만 ids를 빈 배열로 하세요.
+**포괄적 선정 원칙:**
+- 직무·기술·역할·취미·지역·산업·경력·설명 중 **하나라도** 요청 조건과 겹치거나 연관되면 선정하세요.
+- 완벽 매칭이 아니어도 "이런 점에서 참고할 수 있음"이면 포함. **2~5명** 선정.
+- 같은 분야 다른 역할(기획·개발·디자인·마케팅 등)도 협업·연결 관점에서 포함 가능.
 
-**구직·구인 요청 시:** 특정 직무·산업을 말했으면 그와 **연관된** 명함만 추천. 직무/산업이 전혀 다른 사람은 넣지 마세요. 다만 같은 산업 내 다른 역할(예: 기획·디자인·마케팅)도 "협업 가능 인맥"으로 부분 매칭해 1~2명 포함 가능.
-- **조건에 맞거나 부분이라도 관련 있는 수집 명함이 정말 하나도 없을 때만** ids를 빈 배열 []로 반환하세요.
+**reasons 규칙:** 각 id에 대해 2~4문장으로 **왜 이 사람을 뽑았는지** 구체적으로 작성.
 
-**reasons 규칙:** 각 id에 대해 2~4문장으로 **왜 이 사람을 뽑았는지** 구체적으로 작성. (1) 명함의 어떤 내용이 (2) 요청 조건과 어떻게 맞는지 (3) 이 프로젝트/만남/구직에 왜 도움이 되는지. 한 줄 요약 금지.
+Return ONLY valid JSON: {"ids": ["uuid1", ...], "reasons": {"uuid1": "구체적 선정 이유 2~4문장 (한국어)", ...}}. Order by fit. 2-5 people. 반드시 1명 이상 선정. 전혀 무관한 명함만 있을 때만 {"ids": [], "reasons": {}}.`
 
-Return ONLY valid JSON: {"ids": ["uuid1", ...], "reasons": {"uuid1": "구체적 선정 이유 2~4문장 (한국어)", ...}}. Order by fit. 1-5 people. 정말 관련 인원이 전혀 없을 때만 {"ids": [], "reasons": {}}.`
+const CONTEXT_MATCHER_RELAXED_SYSTEM = `You pick 2-5 people from the user's collected cards who are **related in any way** to the criteria. 기술·직무·취미·지역·역할·산업 중 하나라도 겹치거나 연관되면 선정. 완벽한 매칭이 아니어도 "이런 측면에서 참고할 수 있음"이면 포함. reasons에 "OO 측면에서 관련이 있어 선정했습니다"처럼 구체적으로 적으세요.
+Return ONLY valid JSON: {"ids": ["uuid1", ...], "reasons": {"uuid1": "선정 이유 (한국어)", ...}}. 수집 명함이 있으면 반드시 1명 이상 선정.`
 
-const CONTEXT_MATCHER_RELAXED_SYSTEM = `You pick 1-3 people from the user's collected cards who are **most related** to the criteria, even if not a perfect match. 기술·직무·취미·지역·역할 중 하나라도 겹치면 선정 가능. reasons에 "OO 측면에서 관련이 있어 선정했습니다"처럼 구체적으로 적으세요.
-Return ONLY valid JSON: {"ids": ["uuid1", ...], "reasons": {"uuid1": "선정 이유 (한국어)", ...}}. 반드시 1명 이상 선정.`
+/** LLM에 한 번에 넘기는 수집 명함 상한. 너무 많으면 토큰 한도·혼란으로 0명 반환 가능 */
+const MAX_CARDS_FOR_CONTEXT_MATCHER = 200
+
+/** 조건(criteria) 키워드와의 매칭 점수로 상위 limit개 인덱스 반환. 전체 수집 명함 중에서 후보만 골라 LLM에 넘긴다. */
+function pickCandidatesByCriteria(summaries: CardSummary[], criteria: string, limit: number): number[] {
+  const terms = criteria
+    .replace(/[\s,·\-]+/g, ' ')
+    .split(' ')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 1)
+  const scored = summaries.map((sum, idx) => {
+    const text = [sum.title, sum.expertise, sum.description, sum.name, sum.scores]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    let score = 0
+    for (const t of terms) {
+      if (t && text.includes(t)) score += 1
+    }
+    if (terms.length === 0) score = 1
+    return { idx, score }
+  })
+  scored.sort((a, b) => b.score - a.score)
+  const indices = scored.slice(0, limit).map((x) => x.idx)
+  return indices
+}
 
 async function runContextMatcher(
   supabase: ReturnType<typeof createClient>,
@@ -871,10 +909,17 @@ async function runContextMatcher(
   contextType: string,
   streamOpts?: StreamOpts
 ): Promise<{ summary: string; recommendations: { card: Record<string, unknown>; reason: string }[]; primaryText: string; secondText: string }> {
-  const { cards, cardSummaries } = await getCollectedCardsWithSummaries(supabase, userId)
-  if (!cards.length) return { summary: '수집한 명함이 없습니다.', recommendations: [], primaryText: '', secondText: '' }
+  const { cards: allCards, cardSummaries: allSummaries } = await getCollectedCardsWithSummaries(supabase, userId)
+  if (!allCards.length) return { summary: '수집한 명함이 없습니다.', recommendations: [], primaryText: '', secondText: '' }
 
-  const userContent = `criteria: "${criteria}"\ncontext_type: ${contextType}\n\nCollected cards:\n${JSON.stringify(cardSummaries, null, 2)}`
+  const indices = pickCandidatesByCriteria(allSummaries, criteria, MAX_CARDS_FOR_CONTEXT_MATCHER)
+  const cards = indices.map((i) => allCards[i])
+  const cardSummaries = indices.map((i) => allSummaries[i])
+  if (allCards.length > MAX_CARDS_FOR_CONTEXT_MATCHER) {
+    console.log('[ask-agent] runContextMatcher: pre-filtered by criteria to', cards.length, 'of', allCards.length, 'collected cards for LLM')
+  }
+
+  const userContent = `criteria: "${criteria}"\ncontext_type: ${contextType}\n\n**아래 수집 명함 ${cards.length}장 중에서 조건과 조금이라도 관련 있으면 포괄적으로 2~5명 선정하세요. ids를 빈 배열로 반환하지 마세요.**\n\nCollected cards:\n${JSON.stringify(cardSummaries, null, 2)}`
   const cardMap = new Map(cards.map((c) => [c.id as string, c]))
 
   const parseContextMatcherResponse = (content: string): { summary: string; recommendations: { card: Record<string, unknown>; reason: string }[] } => {
@@ -904,7 +949,7 @@ async function runContextMatcher(
         model: 'gpt-4o-mini',
         messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }],
         max_tokens: 1200,
-        temperature: 0.3,
+        temperature: 0.5,
       }),
     })
     if (!res.ok) return { summary: '컨텍스트 매칭 중 오류가 났습니다.', recommendations: [] }
@@ -918,6 +963,13 @@ async function runContextMatcher(
     const relaxed = await openaiCall(CONTEXT_MATCHER_RELAXED_SYSTEM)
     if (relaxed.recommendations.length > 0) {
       out = { ...relaxed, summary: `(관련 인맥 중 선정) ${relaxed.summary}` }
+    } else {
+      const take = Math.min(cards.length, 5)
+      console.log('[ask-agent] runContextMatcher: LLM returned 0, using fallback with', take, 'cards')
+      out = {
+        summary: `수집 명함 ${cards.length}장 중 ${take}명 선정했습니다.`,
+        recommendations: cards.slice(0, take).map((c) => ({ card: c, reason: '수집하신 명함 중 조건과 연관될 수 있어 선정했습니다. 구체적 매칭은 메시지에서 보완해 주세요.' })),
+      }
     }
   }
   function formatContextMatcherResult(raw: string): string {
@@ -1001,7 +1053,7 @@ async function runMessageArchitect(
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [{ role: 'system', content: MESSAGE_ARCHITECT_SYSTEM }, { role: 'user', content: userContent }],
-        max_tokens: 4096,
+        max_tokens: 8192,
         temperature: 0.5,
       }),
     })
@@ -1015,7 +1067,7 @@ async function runMessageArchitect(
       if (streamOpts) streamOpts.writeStream({ type: 'step_part', from: streamOpts.agentLabel, part: 'GPT-4o-mini', content: r })
       return r
     }),
-    callOpenAISecondModel(openaiKey, MESSAGE_ARCHITECT_SYSTEM, userContent, 2800).then((r) => {
+    callOpenAISecondModel(openaiKey, MESSAGE_ARCHITECT_SYSTEM, userContent, 5600).then((r) => {
       if (streamOpts && r) streamOpts.writeStream({ type: 'step_part', from: streamOpts.agentLabel, part: 'GPT-3.5', content: r })
       return r
     }),
@@ -1221,7 +1273,7 @@ serve(async (req) => {
           messages: openAiMessages,
           tools: TOOLS,
           tool_choice: 'auto',
-          max_tokens: 4096,
+          max_tokens: 8192,
           temperature: 0.4,
         }),
       })

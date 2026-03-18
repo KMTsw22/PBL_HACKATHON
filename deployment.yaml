@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: networking-agent-deployment
+spec:
+  replicas: 3          # 서버를 3개 띄우라는 명령
+  selector:
+    matchLabels:
+      app: networking-agent
+  template:
+    metadata:
+      labels:
+        app: networking-agent
+    spec:
+      containers:
+      - name: my-app
+        image: mintae818/my-networking-app:v1
+        ports:
+        - containerPort: 80

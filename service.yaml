@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: networking-agent-service
+spec:
+  type: LoadBalancer    # 로컬(Docker Desktop)에서는 이게 내 브라우저와 연결해줍니다.
+  selector:
+    app: networking-agent # 아까 deployment.yaml에 적은 이름과 똑같아야 해요!
+  ports:
+    - protocol: TCP
+      port: 80          # 브라우저에서 칠 포트 (기본 80)
+      targetPort: 80  # 내 React 앱(Vite)이 돌아가는 포트
