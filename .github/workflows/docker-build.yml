@@ -3,7 +3,7 @@ name: Docker Build and Push
 # 언제 실행할 것인가? (main 브랜치에 push가 일어날 때)
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "master" ]
 
 jobs:
   build-and-push:
@@ -28,4 +28,4 @@ jobs:
         context: .
         push: true
         # 여기 [내아이디] 부분을 실제 도커 허브 아이디로 바꿔주세요!
-        tags: ${{ secrets.DOCKER_USERNAME }}/my-networking-app:latest
+        tags: mintae818/my-networking-app:latest
